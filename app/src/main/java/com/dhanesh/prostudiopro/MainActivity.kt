@@ -14,6 +14,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
@@ -48,9 +49,11 @@ import kotlin.math.roundToInt
 
 data class CanvasLayer(
     val id: Long = System.currentTimeMillis(),
-    val text: String,
+    val text: String = "",
+    val imageBitmap: Bitmap? = null,
     val isSticker: Boolean = false,
     val color: Color = Color.White,
+    val opacity: Float = 1f,
     val offsetX: Float = 0f,
     val offsetY: Float = 0f,
     val scale: Float = 1f,
@@ -68,7 +71,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme(colorScheme = darkColorScheme(background = Color(0xFF0B0C10))) {
-                ProStudioProApp()
+                ProStudioV2App()
             }
         }
     }
@@ -76,7 +79,7 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProStudioProApp() {
+fun ProStudioV2App() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -85,6 +88,8 @@ fun ProStudioProApp() {
     var displayBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var params by remember { mutableStateOf(EditParams()) }
     var studioBgColor by remember { mutableStateOf<Int?>(null) }
+    var histogramBins by remember { mutableStateOf(FloatArray(32)) }
+    var showHistogram by remember { mutableStateOf(true) }
 
     // Undo / Redo History
     val undoStack = remember { mutableStateListOf<EditorSnapshot>() }
@@ -97,17 +102,22 @@ fun ProStudioProApp() {
         redoStack.clear()
     }
 
-    // Layers (Text & Stickers)
+    // Layers (Text, Stickers & Overlay Photos)
     val layers = remember { mutableStateListOf<CanvasLayer>() }
     var selectedLayerId by remember { mutableStateOf<Long?>(null) }
     var showTextDialog by remember { mutableStateOf(false) }
     var newTextInput by remember { mutableStateOf("") }
     var newTextColor by remember { mutableStateOf(Color.White) }
 
-    // UI Tabs & States
-    val tools = listOf("Crop", "Light", "Color", "Color Mix", "Effects", "AI & BG", "Layers", "Presets")
+    // Saved User Presets
+    val customPresets = remember { mutableStateListOf<Pair<String, EditParams>>() }
+
+    // Tools & Sub-states
+    val tools = listOf("Crop", "Light", "Color", "Color Mix", "Grading", "Effects", "Heal", "AI & BG", "Layers", "Presets")
     var activeTool by remember { mutableStateOf("Light") }
     var selectedHslColor by remember { mutableStateOf("Red") }
+    var gradingZone by remember { mutableStateOf("Shadows") }
+    var brushSize by remember { mutableFloatStateOf(45f) }
     var isProcessing by remember { mutableStateOf(false) }
     var showOriginal by remember { mutableStateOf(false) }
 
@@ -116,48 +126,37 @@ fun ProStudioProApp() {
     var exportAsPng by remember { mutableStateOf(false) }
     var exportQuality by remember { mutableFloatStateOf(95f) }
 
-    // Canvas Zoom & Size
+    // Canvas Zoom & Viewport
     var canvasScale by remember { mutableFloatStateOf(1f) }
     var canvasOffset by remember { mutableStateOf(Offset.Zero) }
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
 
-    // Real-Time GPU Render Pipeline
+    // Real-Time GPU Render + Live Histogram
     LaunchedEffect(baseBitmap, params, studioBgColor) {
         val src = baseBitmap ?: return@LaunchedEffect
-        val rendered = withContext(Dispatchers.Default) {
+        val (rendered, hist) = withContext(Dispatchers.Default) {
             val graded = GpuColorEngine.render(context, src, params)
-            if (studioBgColor != null) {
+            val finalFrame = if (studioBgColor != null) {
                 val out = Bitmap.createBitmap(graded.width, graded.height, Bitmap.Config.ARGB_8888)
                 val c = Canvas(out)
                 c.drawColor(studioBgColor!!)
                 c.drawBitmap(graded, 0f, 0f, null)
                 out
             } else graded
+            val bins = GpuColorEngine.computeHistogram(finalFrame)
+            Pair(finalFrame, bins)
         }
         displayBitmap = rendered
+        histogramBins = hist
     }
 
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+    // Main Photo Picker
+    val mainPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri?.let {
-            val raw = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                val src = ImageDecoder.createSource(context.contentResolver, it)
-                ImageDecoder.decodeBitmap(src) { d, _, _ ->
-                    d.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-                    d.isMutableRequired = true
-                }
-            } else {
-                @Suppress("DEPRECATION")
-                MediaStore.Images.Media.getBitmap(context.contentResolver, it)
-            }
-            val maxDim = 2048
-            val ratio = minOf(maxDim.toFloat() / raw.width, maxDim.toFloat() / raw.height, 1f)
-            val scaled = if (ratio < 1f) {
-                Bitmap.createScaledBitmap(raw, (raw.width * ratio).toInt(), (raw.height * ratio).toInt(), true)
-            } else raw
-
-            originalBitmap = scaled
-            baseBitmap = scaled
-            displayBitmap = scaled
+            val raw = decodeUriToBitmap(context, it, 2048) ?: return@let
+            originalBitmap = raw
+            baseBitmap = raw
+            displayBitmap = raw
             params = EditParams()
             studioBgColor = null
             layers.clear()
@@ -168,6 +167,16 @@ fun ProStudioProApp() {
         }
     }
 
+    // Overlay Photo Picker (Add Photo Layer)
+    val overlayPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        uri?.let {
+            val overlayBmp = decodeUriToBitmap(context, it, 1024) ?: return@let
+            val l = CanvasLayer(imageBitmap = overlayBmp)
+            layers.add(l)
+            selectedLayerId = l.id
+        }
+    }
+
     Scaffold(
         containerColor = Color(0xFF0B0C10),
         topBar = {
@@ -175,15 +184,21 @@ fun ProStudioProApp() {
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF13151C)),
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { picker.launch("image/*") }, modifier = Modifier.size(34.dp)) {
+                        IconButton(onClick = { mainPicker.launch("image/*") }, modifier = Modifier.size(32.dp)) {
                             Icon(Icons.Default.AddPhotoAlternate, contentDescription = "Open", tint = Color(0xFF60A5FA))
                         }
                         Spacer(Modifier.width(4.dp))
-                        Text("PROSTUDIO", fontWeight = FontWeight.ExtraBold, fontSize = 14.sp, color = Color.White, maxLines = 1)
+                        Text("STUDIO PRO", fontWeight = FontWeight.ExtraBold, fontSize = 13.sp, color = Color.White, maxLines = 1)
                     }
                 },
                 actions = {
                     if (baseBitmap != null) {
+                        IconButton(
+                            onClick = { showHistogram = !showHistogram },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(Icons.Default.BarChart, contentDescription = "Histogram", tint = if (showHistogram) Color(0xFF38BDF8) else Color(0xFF64748B))
+                        }
                         IconButton(
                             onClick = {
                                 if (undoStack.isNotEmpty()) {
@@ -195,7 +210,7 @@ fun ProStudioProApp() {
                                 }
                             },
                             enabled = undoStack.isNotEmpty(),
-                            modifier = Modifier.size(34.dp)
+                            modifier = Modifier.size(32.dp)
                         ) {
                             Icon(Icons.Default.Undo, contentDescription = "Undo", tint = if (undoStack.isNotEmpty()) Color.White else Color(0xFF475569))
                         }
@@ -210,32 +225,16 @@ fun ProStudioProApp() {
                                 }
                             },
                             enabled = redoStack.isNotEmpty(),
-                            modifier = Modifier.size(34.dp)
+                            modifier = Modifier.size(32.dp)
                         ) {
                             Icon(Icons.Default.Redo, contentDescription = "Redo", tint = if (redoStack.isNotEmpty()) Color.White else Color(0xFF475569))
-                        }
-                        IconButton(
-                            onClick = {
-                                pushHistory()
-                                baseBitmap = originalBitmap
-                                params = EditParams()
-                                studioBgColor = null
-                                layers.clear()
-                                canvasScale = 1f
-                                canvasOffset = Offset.Zero
-                            },
-                            modifier = Modifier.size(34.dp)
-                        ) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Reset", tint = Color(0xFF94A3B8))
                         }
                         Button(
                             onClick = { showExportDialog = true },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
-                            modifier = Modifier.padding(end = 8.dp).height(34.dp)
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                            modifier = Modifier.padding(end = 6.dp).height(32.dp)
                         ) {
-                            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(15.dp))
-                            Spacer(Modifier.width(4.dp))
                             Text("EXPORT", fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                         }
                     }
@@ -248,32 +247,44 @@ fun ProStudioProApp() {
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // 1. Main Interactive GPU + Layer Canvas
+            // 1. Interactive GPU + Healing Brush + Layer Canvas
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
                     .background(Color(0xFF07080B))
                     .onSizeChanged { viewportSize = it }
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onPress = {
-                                selectedLayerId = null
-                                showOriginal = true
-                                tryAwaitRelease()
-                                showOriginal = false
-                            },
-                            onDoubleTap = {
-                                canvasScale = if (canvasScale > 1f) 1f else 2.5f
-                                canvasOffset = Offset.Zero
-                            }
-                        )
+                    .pointerInput(activeTool) {
+                        if (activeTool == "Heal") {
+                            detectDragGestures(
+                                onDragStart = { pushHistory() },
+                                onDrag = { change, _ ->
+                                    val src = baseBitmap ?: return@detectDragGestures
+                                    baseBitmap = applySpotHealBrush(src, change.position, viewportSize, brushSize)
+                                }
+                            )
+                        } else {
+                            detectTapGestures(
+                                onPress = {
+                                    selectedLayerId = null
+                                    showOriginal = true
+                                    tryAwaitRelease()
+                                    showOriginal = false
+                                },
+                                onDoubleTap = {
+                                    canvasScale = if (canvasScale > 1f) 1f else 2.5f
+                                    canvasOffset = Offset.Zero
+                                }
+                            )
+                        }
                     }
-                    .pointerInput(Unit) {
-                        detectTransformGestures { _, pan, zoom, _ ->
-                            if (selectedLayerId == null) {
-                                canvasScale = (canvasScale * zoom).coerceIn(1f, 5f)
-                                canvasOffset = if (canvasScale > 1f) canvasOffset + pan else Offset.Zero
+                    .pointerInput(activeTool, selectedLayerId) {
+                        if (activeTool != "Heal") {
+                            detectTransformGestures { _, pan, zoom, _ ->
+                                if (selectedLayerId == null) {
+                                    canvasScale = (canvasScale * zoom).coerceIn(1f, 5f)
+                                    canvasOffset = if (canvasScale > 1f) canvasOffset + pan else Offset.Zero
+                                }
                             }
                         }
                     },
@@ -299,7 +310,7 @@ fun ProStudioProApp() {
                             modifier = Modifier.fillMaxSize()
                         )
 
-                        // Interactive Text & Sticker Layers Overlay
+                        // Interactive Text, Sticker & Photo Overlay Layers
                         layers.forEachIndexed { idx, layer ->
                             val isSelected = selectedLayerId == layer.id
                             Box(
@@ -308,7 +319,8 @@ fun ProStudioProApp() {
                                     .graphicsLayer(
                                         scaleX = layer.scale,
                                         scaleY = layer.scale,
-                                        rotationZ = layer.rotation
+                                        rotationZ = layer.rotation,
+                                        alpha = layer.opacity
                                     )
                                     .border(
                                         width = if (isSelected) 1.5.dp else 0.dp,
@@ -324,18 +336,50 @@ fun ProStudioProApp() {
                                             layers[idx] = layer.copy(
                                                 offsetX = layer.offsetX + pan.x,
                                                 offsetY = layer.offsetY + pan.y,
-                                                scale = (layer.scale * zoom).coerceIn(0.4f, 4f),
+                                                scale = (layer.scale * zoom).coerceIn(0.3f, 4.5f),
                                                 rotation = layer.rotation + rot
                                             )
                                         }
                                     }
-                                    .padding(6.dp)
+                                    .padding(4.dp)
                             ) {
-                                Text(
-                                    text = layer.text,
-                                    color = layer.color,
-                                    fontSize = if (layer.isSticker) 42.sp else 26.sp,
-                                    fontWeight = FontWeight.ExtraBold
+                                if (layer.imageBitmap != null) {
+                                    Image(
+                                        bitmap = layer.imageBitmap.asImageBitmap(),
+                                        contentDescription = "Layer",
+                                        modifier = Modifier.size(140.dp),
+                                        contentScale = ContentScale.Fit
+                                    )
+                                } else {
+                                    Text(
+                                        text = layer.text,
+                                        color = layer.color,
+                                        fontSize = if (layer.isSticker) 44.sp else 26.sp,
+                                        fontWeight = FontWeight.ExtraBold
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Live DSLR Histogram Overlay (Top Right)
+                    if (showHistogram && !showOriginal) {
+                        Canvas(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(10.dp)
+                                .size(width = 96.dp, height = 44.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color.Black.copy(alpha = 0.65f))
+                                .padding(4.dp)
+                        ) {
+                            val barW = size.width / histogramBins.size
+                            histogramBins.forEachIndexed { i, v ->
+                                val h = v * size.height
+                                drawRect(
+                                    color = Color(0xFF60A5FA).copy(alpha = 0.85f),
+                                    topLeft = Offset(i * barW, size.height - h),
+                                    size = androidx.compose.ui.geometry.Size(barW * 0.85f, h)
                                 )
                             }
                         }
@@ -354,14 +398,14 @@ fun ProStudioProApp() {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color(0xFF3B82F6), modifier = Modifier.size(54.dp))
                         Spacer(Modifier.height(10.dp))
-                        Text("LIGHTROOM + PICSART STUDIO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                        Text("100% Offline GPU & AI Engine", color = Color(0xFF94A3B8), fontSize = 12.sp)
+                        Text("PROSTUDIO V2 — CINEMA & AI ENGINE", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("16-Bit Shaders • 3-Way Grading • Offline AI", color = Color(0xFF94A3B8), fontSize = 12.sp)
                         Spacer(Modifier.height(16.dp))
                         Button(
-                            onClick = { picker.launch("image/*") },
+                            onClick = { mainPicker.launch("image/*") },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB))
                         ) {
-                            Text("IMPORT PHOTO FROM GALLERY", fontWeight = FontWeight.Bold)
+                            Text("OPEN PHOTO FROM GALLERY", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -374,13 +418,13 @@ fun ProStudioProApp() {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             CircularProgressIndicator(color = Color(0xFF3B82F6))
                             Spacer(Modifier.height(10.dp))
-                            Text("Running On-Device Neural Engine...", color = Color.White, fontSize = 13.sp)
+                            Text("Processing On-Device AI...", color = Color.White, fontSize = 13.sp)
                         }
                     }
                 }
             }
 
-            // 2. Bottom Pro Editing Controls Panel
+            // 2. Bottom Controls Panel
             if (baseBitmap != null) {
                 Column(
                     modifier = Modifier
@@ -388,7 +432,6 @@ fun ProStudioProApp() {
                         .background(Color(0xFF13151C))
                         .padding(top = 8.dp, bottom = 6.dp)
                 ) {
-                    // Tool Sub-Panel
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -398,32 +441,21 @@ fun ProStudioProApp() {
                     ) {
                         when (activeTool) {
                             "Crop" -> {
-                                Text("ASPECT RATIO & GEOMETRY", color = Color(0xFF94A3B8), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                Spacer(Modifier.height(8.dp))
                                 Row(
                                     modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    val ratios = listOf(
-                                        "1:1 Square" to 1f,
-                                        "4:5 Portrait" to 0.8f,
-                                        "9:16 Story" to 0.5625f,
-                                        "16:9 Wide" to 1.777f
-                                    )
-                                    ratios.forEach { (label, r) ->
+                                    listOf("1:1" to 1f, "4:5" to 0.8f, "9:16" to 0.5625f, "16:9" to 1.777f).forEach { (label, r) ->
                                         StudioChip(label) {
                                             pushHistory()
                                             baseBitmap = GpuColorEngine.cropAndTransform(baseBitmap!!, r, 0f, false)
                                         }
                                     }
-                                }
-                                Spacer(Modifier.height(8.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     StudioChip("Rotate 90°") {
                                         pushHistory()
                                         baseBitmap = GpuColorEngine.cropAndTransform(baseBitmap!!, null, 90f, false)
                                     }
-                                    StudioChip("Flip Horizontal") {
+                                    StudioChip("Flip H") {
                                         pushHistory()
                                         baseBitmap = GpuColorEngine.cropAndTransform(baseBitmap!!, null, 0f, true)
                                     }
@@ -460,13 +492,12 @@ fun ProStudioProApp() {
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     channels.forEach { (name, col) ->
-                                        val isSel = selectedHslColor == name
                                         Box(
                                             modifier = Modifier
                                                 .size(28.dp)
                                                 .clip(CircleShape)
                                                 .background(col)
-                                                .border(if (isSel) 2.5.dp else 0.dp, Color.White, CircleShape)
+                                                .border(if (selectedHslColor == name) 2.5.dp else 0.dp, Color.White, CircleShape)
                                                 .clickable { selectedHslColor = name }
                                         )
                                     }
@@ -483,12 +514,42 @@ fun ProStudioProApp() {
                                 }
                             }
 
+                            "Grading" -> {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 6.dp)) {
+                                    listOf("Shadows", "Midtones", "Highlights").forEach { z ->
+                                        StudioChip(if (gradingZone == z) "✓ $z" else z) { gradingZone = z }
+                                    }
+                                }
+                                val currentTint = when (gradingZone) {
+                                    "Shadows" -> params.shadowTint
+                                    "Midtones" -> params.midtoneTint
+                                    else -> params.highlightTint
+                                }
+                                fun updateZone(newArr: FloatArray) {
+                                    params = when (gradingZone) {
+                                        "Shadows" -> params.copy(shadowTint = newArr)
+                                        "Midtones" -> params.copy(midtoneTint = newArr)
+                                        else -> params.copy(highlightTint = newArr)
+                                    }
+                                }
+                                StudioSlider("Red / Cyan", currentTint[0], -1f..1f) { updateZone(floatArrayOf(it, currentTint[1], currentTint[2])) }
+                                StudioSlider("Green / Mag", currentTint[1], -1f..1f) { updateZone(floatArrayOf(currentTint[0], it, currentTint[2])) }
+                                StudioSlider("Blue / Warm", currentTint[2], -1f..1f) { updateZone(floatArrayOf(currentTint[0], currentTint[1], it)) }
+                            }
+
                             "Effects" -> {
                                 StudioSlider("Clarity", params.clarity, -0.4f..1f) { params = params.copy(clarity = it) }
                                 StudioSlider("Dehaze", params.dehaze, 0f..0.8f) { params = params.copy(dehaze = it) }
                                 StudioSlider("Sharpen", params.sharpen, 0f..3.5f) { params = params.copy(sharpen = it) }
                                 StudioSlider("Vignette", 1f - params.vignette, 0f..0.65f) { params = params.copy(vignette = 1f - it) }
                                 StudioSlider("Film Grain", params.grain, 0f..0.35f) { params = params.copy(grain = it) }
+                            }
+
+                            "Heal" -> {
+                                Text("SPOT HEAL / SKIN SMOOTH BRUSH", color = Color(0xFF60A5FA), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text("Swipe your finger directly on blemishes or spots on the photo to blend them.", color = Color(0xFF94A3B8), fontSize = 11.sp)
+                                Spacer(Modifier.height(6.dp))
+                                StudioSlider("Brush Size", brushSize, 15f..90f) { brushSize = it }
                             }
 
                             "AI & BG" -> {
@@ -522,18 +583,18 @@ fun ProStudioProApp() {
                                     ) { Text("DSLR BLUR", fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1) }
                                 }
                                 Spacer(Modifier.height(8.dp))
-                                Text("STUDIO BACKDROP (AFTER CUTOUT):", color = Color(0xFF94A3B8), fontSize = 10.sp)
-                                Spacer(Modifier.height(4.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    val bgs = listOf(
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    listOf(
                                         "None" to null,
                                         "White" to android.graphics.Color.WHITE,
                                         "Dark" to android.graphics.Color.parseColor("#111827"),
                                         "Royal Blue" to android.graphics.Color.parseColor("#1D4ED8"),
                                         "Crimson" to android.graphics.Color.parseColor("#B91C1C"),
                                         "Emerald" to android.graphics.Color.parseColor("#047857")
-                                    )
-                                    bgs.forEach { (label, col) ->
+                                    ).forEach { (label, col) ->
                                         StudioChip(label) {
                                             pushHistory()
                                             studioBgColor = col
@@ -543,60 +604,69 @@ fun ProStudioProApp() {
                             }
 
                             "Layers" -> {
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                                    StudioChip("+ Add Text") { showTextDialog = true }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    StudioChip("+ Text") { showTextDialog = true }
+                                    StudioChip("+ Add Photo") { overlayPicker.launch("image/*") }
                                     if (selectedLayerId != null) {
-                                        StudioChip("Delete Selected") {
+                                        StudioChip("Delete Layer") {
                                             layers.removeAll { it.id == selectedLayerId }
                                             selectedLayerId = null
                                         }
                                     }
                                 }
-                                Spacer(Modifier.height(6.dp))
-                                Text("QUICK STICKERS (DRAG & PINCH ON PHOTO):", color = Color(0xFF94A3B8), fontSize = 10.sp)
+                                val selIdx = layers.indexOfFirst { it.id == selectedLayerId }
+                                if (selIdx >= 0) {
+                                    StudioSlider("Opacity", layers[selIdx].opacity, 0.1f..1f) { newOp ->
+                                        layers[selIdx] = layers[selIdx].copy(opacity = newOp)
+                                    }
+                                }
                                 Row(
                                     modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    val stickers = listOf("🔥", "👑", "⚡", "🎬", "✨", "💯", "🎧", "😎")
-                                    stickers.forEach { emoji ->
+                                    listOf("🔥", "👑", "⚡", "🎬", "✨", "💯", "🎧", "😎").forEach { emoji ->
                                         TextButton(onClick = {
-                                            val layer = CanvasLayer(text = emoji, isSticker = true)
-                                            layers.add(layer)
-                                            selectedLayerId = layer.id
-                                        }) {
-                                            Text(emoji, fontSize = 24.sp)
-                                        }
+                                            val l = CanvasLayer(text = emoji, isSticker = true)
+                                            layers.add(l)
+                                            selectedLayerId = l.id
+                                        }) { Text(emoji, fontSize = 22.sp) }
                                     }
                                 }
                             }
 
                             "Presets" -> {
                                 Row(
-                                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 8.dp),
+                                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    StudioChip("Teal & Orange") {
+                                    StudioChip("+ Save Preset") {
+                                        customPresets.add("My Look ${customPresets.size + 1}" to params)
+                                        Toast.makeText(context, "Preset Saved!", Toast.LENGTH_SHORT).show()
+                                    }
+                                    customPresets.forEach { (name, savedParams) ->
+                                        StudioChip("★ $name") {
+                                            pushHistory()
+                                            params = savedParams
+                                        }
+                                    }
+                                    StudioChip("Cinema Teal") {
                                         pushHistory()
                                         params = EditParams(
-                                            contrast = 1.22f, temperature = 4600f, clarity = 0.25f, vignette = 0.65f,
-                                            hslChannels = mapOf(
-                                                "Orange" to HslChannel(saturation = 0.25f, luminance = 0.1f),
-                                                "Blue" to HslChannel(hue = -0.35f, saturation = 0.35f)
-                                            )
+                                            contrast = 1.24f, clarity = 0.25f, vignette = 0.65f,
+                                            shadowTint = floatArrayOf(-0.25f, 0.05f, 0.3f),
+                                            highlightTint = floatArrayOf(0.25f, 0.08f, -0.2f)
                                         )
                                     }
-                                    StudioChip("Golden Sunset") {
+                                    StudioChip("Golden Hour") {
                                         pushHistory()
                                         params = EditParams(exposure = 0.12f, temperature = 6600f, tint = 14f, vibrance = 0.35f)
                                     }
                                     StudioChip("Moody Dark") {
                                         pushHistory()
                                         params = EditParams(exposure = -0.2f, contrast = 1.35f, saturation = 0.72f, dehaze = 0.25f, vignette = 0.55f)
-                                    }
-                                    StudioChip("Vintage Film") {
-                                        pushHistory()
-                                        params = EditParams(contrast = 0.92f, blacks = 0.12f, temperature = 5600f, grain = 0.18f, vignette = 0.7f)
                                     }
                                     StudioChip("B&W Noir") {
                                         pushHistory()
@@ -609,7 +679,6 @@ fun ProStudioProApp() {
 
                     HorizontalDivider(color = Color(0xFF1E293B), thickness = 1.dp)
 
-                    // Fixed Single-Line Horizontal Scrollable Bottom Toolbar (No Vertical Text Wrapping!)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -641,7 +710,6 @@ fun ProStudioProApp() {
         }
     }
 
-    // Add Text Dialog
     if (showTextDialog) {
         AlertDialog(
             onDismissRequest = { showTextDialog = false },
@@ -651,7 +719,7 @@ fun ProStudioProApp() {
                     OutlinedTextField(
                         value = newTextInput,
                         onValueChange = { newTextInput = it },
-                        placeholder = { Text("Enter title or caption...") },
+                        placeholder = { Text("Enter text...") },
                         singleLine = true
                     )
                     Spacer(Modifier.height(10.dp))
@@ -680,20 +748,16 @@ fun ProStudioProApp() {
                     showTextDialog = false
                 }) { Text("ADD") }
             },
-            dismissButton = {
-                TextButton(onClick = { showTextDialog = false }) { Text("CANCEL") }
-            }
+            dismissButton = { TextButton(onClick = { showTextDialog = false }) { Text("CANCEL") } }
         )
     }
 
-    // Pro Export Settings Dialog (PDF 1 & 3)
     if (showExportDialog) {
         AlertDialog(
             onDismissRequest = { showExportDialog = false },
             title = { Text("Export High-Res Image") },
             text = {
                 Column {
-                    Text("Format:", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         StudioChip(if (!exportAsPng) "✓ JPG (Photo)" else "JPG (Photo)") { exportAsPng = false }
                         StudioChip(if (exportAsPng) "✓ PNG (Transparent)" else "PNG (Transparent)") { exportAsPng = true }
@@ -716,11 +780,62 @@ fun ProStudioProApp() {
                     }
                 }) { Text("SAVE TO GALLERY") }
             },
-            dismissButton = {
-                TextButton(onClick = { showExportDialog = false }) { Text("CANCEL") }
-            }
+            dismissButton = { TextButton(onClick = { showExportDialog = false }) { Text("CANCEL") } }
         )
     }
+}
+
+private fun decodeUriToBitmap(context: Context, uri: Uri, maxDim: Int): Bitmap? {
+    return try {
+        val raw = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val src = ImageDecoder.createSource(context.contentResolver, uri)
+            ImageDecoder.decodeBitmap(src) { d, _, _ ->
+                d.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                d.isMutableRequired = true
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+        }
+        val ratio = minOf(maxDim.toFloat() / raw.width, maxDim.toFloat() / raw.height, 1f)
+        if (ratio < 1f) {
+            Bitmap.createScaledBitmap(raw, (raw.width * ratio).toInt(), (raw.height * ratio).toInt(), true)
+        } else raw
+    } catch (e: Exception) {
+        null
+    }
+}
+
+private fun applySpotHealBrush(source: Bitmap, touchPos: Offset, viewport: IntSize, radius: Float): Bitmap {
+    if (viewport.width <= 0 || viewport.height <= 0) return source
+    val out = source.copy(Bitmap.Config.ARGB_8888, true)
+    val scaleX = out.width.toFloat() / viewport.width.toFloat()
+    val scaleY = out.height.toFloat() / viewport.height.toFloat()
+    val cx = (touchPos.x * scaleX).toInt().coerceIn(0, out.width - 1)
+    val cy = (touchPos.y * scaleY).toInt().coerceIn(0, out.height - 1)
+    val r = (radius * scaleX * 0.5f).toInt().coerceIn(8, 120)
+
+    val left = (cx - r).coerceAtLeast(0)
+    val top = (cy - r).coerceAtLeast(0)
+    val right = (cx + r).coerceAtMost(out.width)
+    val bottom = (cy + r).coerceAtMost(out.height)
+    if (right - left < 4 || bottom - top < 4) return out
+
+    val patch = Bitmap.createBitmap(out, left, top, right - left, bottom - top)
+    val tiny = Bitmap.createScaledBitmap(patch, 4, 4, true)
+    val smooth = Bitmap.createScaledBitmap(tiny, patch.width, patch.height, true)
+
+    val canvas = Canvas(out)
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { alpha = 190 }
+    val path = android.graphics.Path().apply {
+        addCircle((cx - left).toFloat(), (cy - top).toFloat(), r.toFloat(), android.graphics.Path.Direction.CW)
+    }
+    canvas.save()
+    canvas.translate(left.toFloat(), top.toFloat())
+    canvas.clipPath(path)
+    canvas.drawBitmap(smooth, 0f, 0f, paint)
+    canvas.restore()
+    return out
 }
 
 private fun compositeLayersOnBitmap(base: Bitmap, layers: List<CanvasLayer>, viewport: IntSize): Bitmap {
@@ -740,9 +855,16 @@ private fun compositeLayersOnBitmap(base: Bitmap, layers: List<CanvasLayer>, vie
         canvas.translate(cx, cy)
         canvas.rotate(layer.rotation)
         canvas.scale(layer.scale, layer.scale)
-        paint.color = layer.color.toArgb()
-        paint.textSize = (if (layer.isSticker) 110f else 68f) * scaleFactor
-        canvas.drawText(layer.text, 0f, 0f, paint)
+        paint.alpha = (layer.opacity * 255).toInt()
+        if (layer.imageBitmap != null) {
+            val w = 140f * scaleFactor
+            val dst = RectF(-w / 2f, -w / 2f, w / 2f, w / 2f)
+            canvas.drawBitmap(layer.imageBitmap, null, dst, paint)
+        } else {
+            paint.color = layer.color.toArgb()
+            paint.textSize = (if (layer.isSticker) 110f else 68f) * scaleFactor
+            canvas.drawText(layer.text, 0f, 0f, paint)
+        }
         canvas.restore()
     }
     return out
@@ -783,7 +905,7 @@ fun StudioSlider(label: String, value: Float, range: ClosedFloatingPointRange<Fl
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().height(32.dp)
     ) {
-        Text(label, color = Color(0xFFCBD5E1), fontSize = 11.sp, maxLines = 1, modifier = Modifier.width(84.dp))
+        Text(label, color = Color(0xFFCBD5E1), fontSize = 11.sp, maxLines = 1, modifier = Modifier.width(88.dp))
         Slider(
             value = value,
             onValueChange = onChange,
