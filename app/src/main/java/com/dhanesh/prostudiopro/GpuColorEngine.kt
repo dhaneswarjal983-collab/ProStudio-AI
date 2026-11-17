@@ -8,44 +8,50 @@ import jp.co.cyberagent.android.gpuimage.GPUImage
 import jp.co.cyberagent.android.gpuimage.filter.*
 
 data class HslChannel(
-    val hue: Float = 0f,        // -1.0 to 1.0
-    val saturation: Float = 0f, // -1.0 to 1.0
-    val luminance: Float = 0f   // -1.0 to 1.0
+    val hue: Float = 0f,
+    val saturation: Float = 0f,
+    val luminance: Float = 0f
 )
 
 data class EditParams(
     // Light
-    val exposure: Float = 0f,       // -2.0 to 2.0
-    val contrast: Float = 1f,       // 0.5 to 2.0
-    val highlights: Float = 0f,     // 0.0 to 1.0
-    val shadows: Float = 0f,        // 0.0 to 1.0
-    val whites: Float = 0f,         // -0.5 to 0.5
-    val blacks: Float = 0f,         // -0.5 to 0.5
+    val exposure: Float = 0f,
+    val contrast: Float = 1f,
+    val highlights: Float = 0f,
+    val shadows: Float = 0f,
+    val whites: Float = 0f,
+    val blacks: Float = 0f,
     // Color
-    val temperature: Float = 5000f, // 2500 to 8500
-    val tint: Float = 0f,           // -80 to 80
-    val vibrance: Float = 0f,       // -1.0 to 1.0
-    val saturation: Float = 1f,     // 0.0 to 2.0
-    // 8-Channel HSL Color Mix
+    val temperature: Float = 5000f,
+    val tint: Float = 0f,
+    val vibrance: Float = 0f,
+    val saturation: Float = 1f,
+    // 8-Channel HSL
     val hslChannels: Map<String, HslChannel> = emptyMap(),
+    // 3-Way Cinema Color Grading (RGB Tint offsets for Shadows, Midtones, Highlights)
+    val shadowTint: FloatArray = floatArrayOf(0f, 0f, 0f),
+    val midtoneTint: FloatArray = floatArrayOf(0f, 0f, 0f),
+    val highlightTint: FloatArray = floatArrayOf(0f, 0f, 0f),
     // Effects & Detail
-    val clarity: Float = 0f,        // -0.5 to 1.0
-    val dehaze: Float = 0f,         // 0.0 to 0.8
-    val sharpen: Float = 0f,        // 0.0 to 3.5
-    val vignette: Float = 1.0f,     // 0.35 to 1.0
-    val grain: Float = 0f           // 0.0 to 0.35
+    val clarity: Float = 0f,
+    val dehaze: Float = 0f,
+    val sharpen: Float = 0f,
+    val vignette: Float = 1.0f,
+    val grain: Float = 0f
 )
 
 object GpuColorEngine {
 
-    // Custom OpenGL ES Fragment Shader for Lightroom Whites, Blacks, Dehaze, Grain & 8-Channel HSL
-    private const val PRO_STUDIO_FRAGMENT_SHADER = """
+    private const val CINEMA_FRAGMENT_SHADER = """
         varying highp vec2 textureCoordinate;
         uniform sampler2D inputImageTexture;
         uniform lowp float uWhites;
         uniform lowp float uBlacks;
         uniform lowp float uDehaze;
         uniform lowp float uGrain;
+        uniform lowp vec3 uShadowTint;
+        uniform lowp vec3 uMidtoneTint;
+        uniform lowp vec3 uHighlightTint;
         uniform lowp vec3 uRedHSL;
         uniform lowp vec3 uOrangeHSL;
         uniform lowp vec3 uYellowHSL;
@@ -76,18 +82,27 @@ object GpuColorEngine {
             lowp vec4 texColor = texture2D(inputImageTexture, textureCoordinate);
             lowp vec3 rgb = texColor.rgb;
 
-            // Dehaze (atmospheric contrast + deep saturation)
+            // Dehaze
             if (uDehaze > 0.001) {
                 rgb = (rgb - uDehaze * 0.18) / (1.0 - uDehaze * 0.25);
             }
 
-            // Whites & Blacks tonal endpoints
+            // Whites & Blacks
             lowp float luma = dot(rgb, vec3(0.299, 0.587, 0.114));
             rgb += uWhites * smoothstep(0.55, 1.0, luma);
             rgb += uBlacks * (1.0 - smoothstep(0.0, 0.45, luma));
             rgb = clamp(rgb, 0.0, 1.0);
 
-            // 8-Channel Selective HSL Color Mix
+            // 3-Way Cinema Color Grading (Shadows / Midtones / Highlights)
+            lowp float shadowWeight = 1.0 - smoothstep(0.0, 0.45, luma);
+            lowp float highlightWeight = smoothstep(0.55, 1.0, luma);
+            lowp float midtoneWeight = clamp(1.0 - shadowWeight - highlightWeight, 0.0, 1.0);
+            rgb += uShadowTint * shadowWeight * 0.35;
+            rgb += uMidtoneTint * midtoneWeight * 0.35;
+            rgb += uHighlightTint * highlightWeight * 0.35;
+            rgb = clamp(rgb, 0.0, 1.0);
+
+            // 8-Channel HSL Color Mix
             lowp vec3 hsv = rgb2hsv(rgb);
             lowp float h = hsv.x * 360.0;
             lowp vec3 hslAdj = vec3(0.0);
@@ -106,7 +121,7 @@ object GpuColorEngine {
             }
             rgb = hsv2rgb(hsv);
 
-            // Cinematic Film Grain
+            // Film Grain
             if (uGrain > 0.001) {
                 lowp float n = (hash(textureCoordinate * 1000.0) - 0.5) * uGrain;
                 rgb = clamp(rgb + vec3(n), 0.0, 1.0);
@@ -116,8 +131,8 @@ object GpuColorEngine {
         }
     """
 
-    private class ProStudioCustomFilter(private val params: EditParams) :
-        GPUImageFilter(NO_FILTER_VERTEX_SHADER, PRO_STUDIO_FRAGMENT_SHADER) {
+    private class CinemaCustomFilter(private val params: EditParams) :
+        GPUImageFilter(NO_FILTER_VERTEX_SHADER, CINEMA_FRAGMENT_SHADER) {
 
         override fun onInitialized() {
             super.onInitialized()
@@ -125,6 +140,10 @@ object GpuColorEngine {
             setFloat(android.opengl.GLES20.glGetUniformLocation(program, "uBlacks"), params.blacks)
             setFloat(android.opengl.GLES20.glGetUniformLocation(program, "uDehaze"), params.dehaze)
             setFloat(android.opengl.GLES20.glGetUniformLocation(program, "uGrain"), params.grain)
+
+            setFloatVec3(android.opengl.GLES20.glGetUniformLocation(program, "uShadowTint"), params.shadowTint)
+            setFloatVec3(android.opengl.GLES20.glGetUniformLocation(program, "uMidtoneTint"), params.midtoneTint)
+            setFloatVec3(android.opengl.GLES20.glGetUniformLocation(program, "uHighlightTint"), params.highlightTint)
 
             setHsl("uRedHSL", params.hslChannels["Red"])
             setHsl("uOrangeHSL", params.hslChannels["Orange"])
@@ -154,7 +173,7 @@ object GpuColorEngine {
         group.addFilter(GPUImageWhiteBalanceFilter(params.temperature, params.tint))
         group.addFilter(GPUImageVibranceFilter(params.vibrance))
         group.addFilter(GPUImageSaturationFilter(params.saturation))
-        group.addFilter(ProStudioCustomFilter(params))
+        group.addFilter(CinemaCustomFilter(params))
 
         val totalSharpness = params.sharpen + (if (params.clarity > 0f) params.clarity * 0.9f else 0f)
         if (totalSharpness > 0.01f) {
@@ -173,6 +192,25 @@ object GpuColorEngine {
 
         gpuImage.setFilter(group)
         return gpuImage.bitmapWithFilterApplied
+    }
+
+    // Fast Luminance Histogram (32 bins) for Live DSLR Overlay
+    fun computeHistogram(bitmap: Bitmap): FloatArray {
+        val bins = IntArray(32)
+        val thumb = Bitmap.createScaledBitmap(bitmap, 96, 96, false)
+        val pixels = IntArray(96 * 96)
+        thumb.getPixels(pixels, 0, 96, 0, 0, 96, 96)
+        var maxCount = 1
+        for (p in pixels) {
+            val r = (p shr 16) and 0xFF
+            val g = (p shr 8) and 0xFF
+            val b = p and 0xFF
+            val luma = ((0.299f * r + 0.587f * g + 0.114f * b).toInt()).coerceIn(0, 255)
+            val idx = luma / 8
+            bins[idx]++
+            if (bins[idx] > maxCount) maxCount = bins[idx]
+        }
+        return FloatArray(32) { bins[it].toFloat() / maxCount.toFloat() }
     }
 
     fun cropAndTransform(source: Bitmap, aspectRatio: Float?, rotateDeg: Float, flipH: Boolean): Bitmap {
