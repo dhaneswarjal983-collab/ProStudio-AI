@@ -1,10 +1,14 @@
 package com.prophotostudio.app
 
+import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.MediaStore
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -39,7 +43,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.math.pow
+import kotlin.math.*
 
 private val Background = Color(0xFF0B0D12)
 private val Panel = Color(0xFF171B24)
@@ -51,341 +55,9 @@ private val White = Color(0xFFF7F5FF)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent {
-            ProPhotoStudioApp()
-        }
+        setContent { ProPhotoStudioApp() }
     }
 }
-
-@Composable
-fun ProPhotoStudioApp() {
-    var selectedTab by remember { mutableIntStateOf(0) }
-
-    MaterialTheme(
-        colorScheme = darkColorScheme(
-            background = Background,
-            surface = Panel,
-            primary = Accent
-        )
-    ) {
-        Scaffold(
-            containerColor = Background,
-            bottomBar = {
-                BottomNavigation(selectedTab) {
-                    selectedTab = it
-                }
-            }
-        ) { padding ->
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-            ) {
-                when (selectedTab) {
-                    0 -> HomeScreen(
-                        onEditor = { selectedTab = 1 },
-                        onAI = { selectedTab = 2 },
-                        onProjects = { selectedTab = 3 }
-                    )
-                    1 -> EditorScreen()
-                    2 -> AIStudioScreen()
-                    3 -> ProjectsScreen()
-                    4 -> ProfileScreen()
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun BottomNavigation(
-    selectedTab: Int,
-    onSelect: (Int) -> Unit
-) {
-    val items = listOf(
-        "⌂" to "Home",
-        "▧" to "Edit",
-        "✧" to "AI Studio",
-        "▤" to "Projects",
-        "◉" to "Profile"
-    )
-
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .background(Panel)
-            .navigationBarsPadding()
-            .padding(vertical = 10.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly
-    ) {
-        items.forEachIndexed { index, item ->
-            Column(
-                Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable { onSelect(index) }
-                    .padding(horizontal = 9.dp, vertical = 3.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    item.first,
-                    color = if (selectedTab == index) Accent else Muted,
-                    fontSize = 21.sp
-                )
-                Text(
-                    item.second,
-                    color = if (selectedTab == index) Accent else Muted,
-                    fontSize = 9.sp
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun ScreenColumn(content: @Composable ColumnScope.() -> Unit) {
-    Column(
-        Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp),
-        content = content
-    )
-}
-
-@Composable
-fun Header(title: String, subtitle: String) {
-    Spacer(Modifier.height(18.dp))
-    Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column {
-            Text(
-                title,
-                color = White,
-                fontSize = 19.sp,
-                fontWeight = FontWeight.ExtraBold
-            )
-            Text(
-                subtitle,
-                color = Muted,
-                fontSize = 9.sp,
-                letterSpacing = 2.sp
-            )
-        }
-        Text(
-            "✦ PRO",
-            color = Accent,
-            fontWeight = FontWeight.Bold,
-            fontSize = 13.sp
-        )
-    }
-}
-
-@Composable
-fun SectionTitle(title: String) {
-    Text(
-        title,
-        color = Muted,
-        fontSize = 11.sp,
-        letterSpacing = 2.sp,
-        fontWeight = FontWeight.SemiBold
-    )
-    Spacer(Modifier.height(10.dp))
-}
-
-@Composable
-fun HomeScreen(
-    onEditor: () -> Unit,
-    onAI: () -> Unit,
-    onProjects: () -> Unit
-) {
-    ScreenColumn {
-        Header("PRO PHOTO STUDIO", "CREATE WITHOUT LIMITS")
-        Spacer(Modifier.height(25.dp))
-
-        Text(
-            "Your creative space.",
-            color = White,
-            fontSize = 27.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            "Turn your imagination into art.",
-            color = Muted,
-            fontSize = 14.sp
-        )
-
-        Spacer(Modifier.height(22.dp))
-
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(190.dp)
-                .clip(RoundedCornerShape(24.dp))
-                .background(
-                    Brush.linearGradient(
-                        listOf(
-                            Color(0xFF48366F),
-                            Color(0xFF222B48),
-                            Color(0xFF151925)
-                        )
-                    )
-                )
-                .padding(20.dp)
-        ) {
-            Column(Modifier.align(Alignment.CenterStart)) {
-                Text(
-                    "CREATIVE STUDIO",
-                    color = Color(0xFFD5C5FF),
-                    fontSize = 10.sp,
-                    letterSpacing = 2.sp
-                )
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    "Make every\npixel matter.",
-                    color = White,
-                    fontSize = 27.sp,
-                    fontWeight = FontWeight.Bold,
-                    lineHeight = 33.sp
-                )
-                Spacer(Modifier.height(14.dp))
-                Text(
-                    "Professional photo editing",
-                    color = Color.LightGray,
-                    fontSize = 12.sp
-                )
-            }
-            Text(
-                "✦",
-                Modifier.align(Alignment.TopEnd).padding(12.dp),
-                color = Color(0xFFE2D5FF),
-                fontSize = 45.sp
-            )
-        }
-
-        Spacer(Modifier.height(25.dp))
-        SectionTitle("CREATE")
-
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            ActionCard(
-                Modifier.weight(1f),
-                "▧",
-                "Photo Editor",
-                "Professional tools",
-                Color(0xFF59458D),
-                onEditor
-            )
-            ActionCard(
-                Modifier.weight(1f),
-                "✧",
-                "AI Studio",
-                "AI creativity",
-                Color(0xFF285A65),
-                onAI
-            )
-        }
-
-        Spacer(Modifier.height(25.dp))
-        SectionTitle("AI CREATIVE STUDIO")
-
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            AiTool("✦", "AI Image Generator", "Create images from text")
-            AiTool("◈", "Background Editor", "Background editing tools")
-            AiTool("✧", "AI Photo Enhancement", "Explore image enhancement")
-            AiTool("◇", "Object Removal", "Intelligent object editing")
-        }
-
-        Spacer(Modifier.height(25.dp))
-        SectionTitle("YOUR WORKSPACE")
-
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(18.dp))
-                .background(Panel)
-                .clickable { onProjects() }
-                .padding(20.dp)
-        ) {
-            Column {
-                Text(
-                    "No projects yet",
-                    color = White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
-                Spacer(Modifier.height(5.dp))
-                Text(
-                    "Your edited photos and projects will appear here.",
-                    color = Muted,
-                    fontSize = 12.sp
-                )
-                Spacer(Modifier.height(10.dp))
-                Text("VIEW PROJECTS  →", color = Accent, fontSize = 11.sp)
-            }
-        }
-
-        Spacer(Modifier.height(20.dp))
-    }
-}
-
-@Composable
-fun ActionCard(
-    modifier: Modifier = Modifier,
-    icon: String,
-    title: String,
-    subtitle: String,
-    color: Color,
-    onClick: () -> Unit
-) {
-    Column(
-        modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(Panel)
-            .clickable { onClick() }
-            .padding(16.dp)
-    ) {
-        Box(
-            Modifier
-                .size(43.dp)
-                .clip(RoundedCornerShape(13.dp))
-                .background(color),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(icon, color = White, fontSize = 24.sp)
-        }
-        Spacer(Modifier.height(15.dp))
-        Text(title, color = White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-        Spacer(Modifier.height(4.dp))
-        Text(subtitle, color = Muted, fontSize = 10.sp)
-    }
-}
-
-@Composable
-fun AiTool(icon: String, title: String, subtitle: String) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(15.dp))
-            .background(Panel)
-            .clickable { }
-            .padding(15.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(icon, color = Accent, fontSize = 25.sp)
-        Spacer(Modifier.width(14.dp))
-        Column(Modifier.weight(1f)) {
-            Text(title, color = White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-            Text(subtitle, color = Muted, fontSize = 10.sp)
-        }
-        Text("›", color = Muted, fontSize = 24.sp)
-    }
-}
-
-// ---------------------------------------------------------
-// STAGE 5 - EDITING ENGINE
-// ---------------------------------------------------------
 
 data class EditValues(
     val brightness: Float = 0f,
@@ -397,784 +69,571 @@ data class EditValues(
     val whites: Float = 0f,
     val blacks: Float = 0f,
     val temperature: Float = 0f,
-    val tint: Float = 0f
+    val tint: Float = 0f,
+    val hue: Float = 0f,
+    val redHsl: Float = 0f,
+    val greenHsl: Float = 0f,
+    val blueHsl: Float = 0f,
+    val sharpness: Float = 0f,
+    val clarity: Float = 0f,
+    val vignette: Float = 0f,
+    val grain: Float = 0f,
+    val blur: Float = 0f,
+    val maskStrength: Float = 0f,
+    val maskSize: Float = 0.55f,
+    val rotation: Int = 0,
+    val crop: Int = 0
+)
+
+private data class Preset(val name: String, val values: EditValues)
+
+private val builtInPresets = listOf(
+    Preset("Original", EditValues()),
+    Preset("Bright", EditValues(brightness = 0.08f, exposure = 0.25f, contrast = 1.08f)),
+    Preset("Warm", EditValues(temperature = 0.35f, saturation = 1.08f, contrast = 1.05f)),
+    Preset("Cool", EditValues(temperature = -0.3f, tint = 0.08f, contrast = 1.08f)),
+    Preset("Mono", EditValues(saturation = 0f, contrast = 1.15f)),
+    Preset("Vivid", EditValues(saturation = 1.35f, contrast = 1.12f, clarity = 0.18f))
 )
 
 @Composable
-fun EditorScreen() {
+fun ProPhotoStudioApp() {
+    var tab by remember { mutableIntStateOf(0) }
+    MaterialTheme(colorScheme = darkColorScheme(background = Background, surface = Panel, primary = Accent)) {
+        Scaffold(
+            containerColor = Background,
+            bottomBar = {
+                Row(
+                    Modifier.fillMaxWidth().background(Panel).navigationBarsPadding().padding(vertical = 9.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    listOf("鈱�" to "Home", "鈻�" to "Edit", "鉁�" to "AI Studio", "鈻�" to "Projects", "鈼�" to "Profile")
+                        .forEachIndexed { index, item ->
+                            Column(
+                                Modifier.clip(RoundedCornerShape(12.dp)).clickable { tab = index }.padding(horizontal = 9.dp, vertical = 3.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(item.first, color = if (tab == index) Accent else Muted, fontSize = 21.sp)
+                                Text(item.second, color = if (tab == index) Accent else Muted, fontSize = 9.sp)
+                            }
+                        }
+                }
+            }
+        ) { padding ->
+            Box(Modifier.fillMaxSize().padding(padding)) {
+                when (tab) {
+                    0 -> HomeScreen(onEdit = { tab = 1 }, onAI = { tab = 2 }, onProjects = { tab = 3 })
+                    1 -> EditorScreen()
+                    2 -> SimpleScreen("AI STUDIO", "AI tools need a separately configured AI service and API key. This screen does not claim to run AI processing.")
+                    3 -> SimpleScreen("MY PROJECTS", "Exported photos are saved in your device Pictures/ProPhotoStudio folder. Project-session management is not included in this single-file editor.")
+                    else -> SimpleScreen("PROFILE & SETTINGS", "Pro Photo Studio\nLocal photo editing workspace")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScreenColumn(content: @Composable ColumnScope.() -> Unit) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), content = content)
+}
+
+@Composable
+private fun Header(title: String, subtitle: String) {
+    Spacer(Modifier.height(18.dp))
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Column {
+            Text(title, color = White, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
+            Text(subtitle, color = Muted, fontSize = 9.sp, letterSpacing = 2.sp)
+        }
+        Text("鉁� PRO", color = Accent, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+    }
+}
+
+@Composable
+private fun SectionTitle(title: String) {
+    Text(title, color = Muted, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.SemiBold)
+    Spacer(Modifier.height(9.dp))
+}
+
+@Composable
+private fun HomeScreen(onEdit: () -> Unit, onAI: () -> Unit, onProjects: () -> Unit) {
+    ScreenColumn {
+        Header("PRO PHOTO STUDIO", "CREATE WITHOUT LIMITS")
+        Spacer(Modifier.height(25.dp))
+        Text("Your creative space.", color = White, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+        Text("Professional photo editing tools.", color = Muted, fontSize = 14.sp)
+        Spacer(Modifier.height(22.dp))
+        Box(
+            Modifier.fillMaxWidth().height(180.dp).clip(RoundedCornerShape(24.dp))
+                .background(Brush.linearGradient(listOf(Color(0xFF48366F), Color(0xFF222B48), Color(0xFF151925)))).padding(20.dp)
+        ) {
+            Column(Modifier.align(Alignment.CenterStart)) {
+                Text("CREATIVE STUDIO", color = Color(0xFFD5C5FF), fontSize = 10.sp)
+                Spacer(Modifier.height(10.dp))
+                Text("Make every\npixel matter.", color = White, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+                Text("Edit, enhance and export photos", color = Color.LightGray, fontSize = 12.sp)
+            }
+            Text("鉁�", Modifier.align(Alignment.TopEnd), color = White, fontSize = 42.sp)
+        }
+        Spacer(Modifier.height(24.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            HomeCard(Modifier.weight(1f), "鈻�", "Photo Editor", "Edit photos", onEdit)
+            HomeCard(Modifier.weight(1f), "鉁�", "AI Studio", "Service required", onAI)
+        }
+        Spacer(Modifier.height(18.dp))
+        Text("YOUR WORKSPACE", color = Muted, fontSize = 11.sp)
+        Spacer(Modifier.height(8.dp))
+        HomeCard(Modifier.fillMaxWidth(), "鈻�", "Projects & exports", "Open workspace information", onProjects)
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun HomeCard(modifier: Modifier, icon: String, title: String, subtitle: String, action: () -> Unit) {
+    Column(modifier.clip(RoundedCornerShape(18.dp)).background(Panel).clickable { action() }.padding(16.dp)) {
+        Text(icon, color = Accent, fontSize = 25.sp)
+        Spacer(Modifier.height(9.dp))
+        Text(title, color = White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        Text(subtitle, color = Muted, fontSize = 10.sp)
+    }
+}
+
+@Composable
+private fun SimpleScreen(title: String, message: String) {
+    ScreenColumn {
+        Header(title, "PRO PHOTO STUDIO")
+        Spacer(Modifier.height(28.dp))
+        Text(message, color = White, fontSize = 17.sp)
+    }
+}
+
+@Composable
+private fun EditorScreen() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-
-    var originalBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var source by remember { mutableStateOf<Bitmap?>(null) }
+    var preview by remember { mutableStateOf<Bitmap?>(null) }
     var values by remember { mutableStateOf(EditValues()) }
     var history by remember { mutableStateOf(listOf(EditValues())) }
     var historyIndex by remember { mutableIntStateOf(0) }
-    var isLoading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var showOriginal by remember { mutableStateOf(false) }
-
+    var loading by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf("") }
+    var before by remember { mutableStateOf(false) }
     var zoom by remember { mutableFloatStateOf(1f) }
-    var offsetX by remember { mutableFloatStateOf(0f) }
-    var offsetY by remember { mutableFloatStateOf(0f) }
+    var panX by remember { mutableFloatStateOf(0f) }
+    var panY by remember { mutableFloatStateOf(0f) }
+    var customPresets by remember { mutableStateOf(listOf<Preset>()) }
 
-    fun resetZoom() {
+    fun record(next: EditValues) {
+        history = (history.take(historyIndex + 1) + next).takeLast(40)
+        historyIndex = history.lastIndex
+        values = next
+        before = false
+    }
+
+    fun resetView() {
         zoom = 1f
-        offsetX = 0f
-        offsetY = 0f
+        panX = 0f
+        panY = 0f
     }
 
-    fun applyEdit(newValues: EditValues) {
-        val updated = history.take(historyIndex + 1) + newValues
-        history = updated
-        historyIndex = updated.lastIndex
-        values = newValues
-    }
-
-    val picker = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickVisualMedia()
-    ) { uri: Uri? ->
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
         if (uri != null) {
-            isLoading = true
-            errorMessage = null
-
+            loading = true
+            message = ""
             scope.launch {
-                val bitmap = withContext(Dispatchers.IO) {
-                    loadPreviewBitmap(context, uri)
-                }
-
-                originalBitmap = bitmap
+                val loaded = withContext(Dispatchers.IO) { loadBitmap(context, uri) }
+                source = loaded
                 values = EditValues()
                 history = listOf(EditValues())
                 historyIndex = 0
-                showOriginal = false
-                resetZoom()
-                isLoading = false
-
-                if (bitmap == null) {
-                    errorMessage = "Photo load nahi ho payi. Dusri photo try karo."
-                }
+                preview = loaded
+                before = false
+                resetView()
+                loading = false
+                message = if (loaded == null) "Photo load nahi hui. Dusri photo try karein." else "Photo loaded."
             }
         }
     }
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .padding(horizontal = 14.dp)
-    ) {
-        Header("PHOTO EDITOR", "PROFESSIONAL WORKSPACE")
-
-        // Fixed preview area: controls scroll independently below it.
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(top = 12.dp, bottom = 7.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("LIVE PREVIEW", color = Muted, fontSize = 10.sp)
-            Text(
-                if (showOriginal) "ORIGINAL" else "EDITED",
-                color = Accent,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold
-            )
+    LaunchedEffect(source, values) {
+        val bitmap = source
+        if (bitmap != null) {
+            loading = true
+            val rendered = withContext(Dispatchers.Default) { renderBitmap(bitmap, values) }
+            preview = rendered
+            loading = false
         }
+    }
 
+    Column(Modifier.fillMaxSize().padding(horizontal = 13.dp)) {
+        Header("PHOTO EDITOR", "STAGE 5 鈥� COMPLETE EDITING WORKSPACE")
+        Row(Modifier.fillMaxWidth().padding(top = 9.dp, bottom = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("LIVE PREVIEW", color = Muted, fontSize = 10.sp)
+            Text(if (before) "ORIGINAL" else "EDITED", color = Accent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        }
         Box(
-            Modifier
-                .fillMaxWidth()
-                .weight(0.9f)
-                .clip(RoundedCornerShape(20.dp))
-                .background(Panel2),
+            Modifier.fillMaxWidth().weight(0.85f).clip(RoundedCornerShape(18.dp)).background(Panel2),
             contentAlignment = Alignment.Center
         ) {
-            when {
-                isLoading -> CircularProgressIndicator(color = Accent)
-
-                originalBitmap != null -> {
-                    val matrix = remember(values, showOriginal) {
-                        createEditColorMatrix(
-                            if (showOriginal) EditValues() else values
-                        )
-                    }
-
-                    Image(
-                        bitmap = originalBitmap!!.asImageBitmap(),
-                        contentDescription = "Photo preview",
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .pointerInput(originalBitmap) {
-                                detectTransformGestures { _, pan, zoomChange, _ ->
-                                    zoom = (zoom * zoomChange).coerceIn(1f, 5f)
-
-                                    if (zoom > 1f) {
-                                        offsetX += pan.x
-                                        offsetY += pan.y
-                                    } else {
-                                        offsetX = 0f
-                                        offsetY = 0f
-                                    }
+            val shown = if (before) source else preview
+            if (loading && shown == null) {
+                CircularProgressIndicator(color = Accent)
+            } else if (shown != null) {
+                Image(
+                    bitmap = shown.asImageBitmap(),
+                    contentDescription = "Photo preview",
+                    modifier = Modifier.fillMaxSize()
+                        .pointerInput(source) {
+                            detectTransformGestures { _, pan, zoomChange, _ ->
+                                zoom = (zoom * zoomChange).coerceIn(1f, 5f)
+                                if (zoom > 1f) {
+                                    panX += pan.x
+                                    panY += pan.y
+                                } else {
+                                    panX = 0f
+                                    panY = 0f
                                 }
                             }
-                            .pointerInput(originalBitmap) {
-                                awaitPointerEventScope {
-                                    while (true) {
-                                        val event = awaitPointerEvent()
-                                        if (event.changes.size == 2 &&
-                                            event.changes.all { it.pressed }
-                                        ) {
-                                            // Pinch is handled by transform gesture.
-                                        }
-                                    }
-                                }
-                            }
-                            .graphicsLayer {
-                                scaleX = zoom
-                                scaleY = zoom
-                                translationX = offsetX
-                                translationY = offsetY
-                            },
-                        contentScale = ContentScale.Fit,
-                        colorFilter = ColorFilter.colorMatrix(matrix)
-                    )
-                }
-
-                else -> {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("▧", color = Accent, fontSize = 55.sp)
-                        Spacer(Modifier.height(10.dp))
-                        Text("Your photo preview", color = White, fontSize = 17.sp)
-                        Text(
-                            "Select a photo to begin editing",
-                            color = Muted,
-                            fontSize = 12.sp
-                        )
-                    }
+                        }
+                        .graphicsLayer { scaleX = zoom; scaleY = zoom; translationX = panX; translationY = panY },
+                    contentScale = ContentScale.Fit
+                )
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("鈻�", color = Accent, fontSize = 48.sp)
+                    Text("Select a photo to begin", color = White)
+                    Text("Your original image remains unchanged", color = Muted, fontSize = 11.sp)
                 }
             }
         }
-
-        if (originalBitmap != null) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "Zoom: ${(zoom * 100).toInt()}%",
-                    color = Muted,
-                    fontSize = 10.sp
-                )
-                Text(
-                    "DOUBLE TAP NOT AVAILABLE",
-                    color = Muted,
-                    fontSize = 9.sp
-                )
-                Text(
-                    "RESET ZOOM",
-                    color = Accent,
-                    fontSize = 10.sp,
-                    modifier = Modifier.clickable { resetZoom() }
-                )
+        if (source != null) {
+            Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Zoom ${(zoom * 100).toInt()}%", color = Muted, fontSize = 10.sp)
+                Text("RESET ZOOM", color = Accent, fontSize = 10.sp, modifier = Modifier.clickable { resetView() })
             }
         }
-
-        if (errorMessage != null) {
-            Text(
-                errorMessage!!,
-                color = Color(0xFFFF8A8A),
-                fontSize = 12.sp,
-                modifier = Modifier.padding(top = 5.dp)
-            )
-        }
-
         Button(
-            onClick = {
-                picker.launch(
-                    PickVisualMediaRequest(
-                        ActivityResultContracts.PickVisualMedia.ImageOnly
-                    )
-                )
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
-            enabled = !isLoading,
+            onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+            enabled = !loading,
+            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Accent),
-            shape = RoundedCornerShape(13.dp)
-        ) {
-            Text(
-                if (originalBitmap == null) "＋  Select Photo" else "▧  Change Photo",
-                color = Background,
-                fontWeight = FontWeight.Bold
-            )
-        }
+            shape = RoundedCornerShape(12.dp)
+        ) { Text(if (source == null) "锛� Select Photo" else "鈻� Change Photo", color = Background, fontWeight = FontWeight.Bold) }
 
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(top = 5.dp),
-            horizontalArrangement = Arrangement.spacedBy(7.dp)
-        ) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             OutlinedButton(
+                onClick = { if (historyIndex > 0) { historyIndex--; values = history[historyIndex] } },
+                enabled = source != null && historyIndex > 0, modifier = Modifier.weight(1f)
+            ) { Text("鈫� Undo") }
+            OutlinedButton(
+                onClick = { if (historyIndex < history.lastIndex) { historyIndex++; values = history[historyIndex] } },
+                enabled = source != null && historyIndex < history.lastIndex, modifier = Modifier.weight(1f)
+            ) { Text("鈫� Redo") }
+            OutlinedButton(onClick = { if (source != null) record(EditValues()) }, enabled = source != null, modifier = Modifier.weight(1f)) { Text("Reset") }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            OutlinedButton(onClick = { before = !before }, enabled = source != null, modifier = Modifier.weight(1f)) {
+                Text(if (before) "Show Edited" else "Before / After")
+            }
+            Button(
                 onClick = {
-                    if (historyIndex > 0) {
-                        historyIndex--
-                        values = history[historyIndex]
+                    val bmp = source
+                    if (bmp != null) {
+                        loading = true
+                        scope.launch {
+                            val output = withContext(Dispatchers.IO) { renderBitmap(bmp, values) }
+                            val result = saveBitmap(context, output)
+                            loading = false
+                            message = if (result != null) "Export successful: Pictures/ProPhotoStudio" else "Export failed. Please try again."
+                        }
                     }
                 },
-                enabled = originalBitmap != null && historyIndex > 0,
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("↶ Undo")
+                enabled = source != null && !loading, modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = Accent)
+            ) { Text("Export", color = Background) }
+        }
+        if (message.isNotBlank()) Text(message, color = if (message.contains("failed", true) || message.contains("nahi", true)) Color(0xFFFF9999) else Muted, fontSize = 10.sp)
+
+        Column(Modifier.weight(1.15f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(top = 10.dp, bottom = 15.dp)) {
+            SectionTitle("LIGHT & COLOR")
+            SliderControl("Brightness", values.brightness, -1f..1f, source != null, { record(values.copy(brightness = it)) })
+            SliderControl("Contrast", values.contrast, 0f..2f, source != null, { record(values.copy(contrast = it)) }, 1f, true)
+            SliderControl("Saturation", values.saturation, 0f..2f, source != null, { record(values.copy(saturation = it)) }, 1f, true)
+            SliderControl("Exposure", values.exposure, -2f..2f, source != null, { record(values.copy(exposure = it)) })
+            SliderControl("Highlights", values.highlights, -1f..1f, source != null, { record(values.copy(highlights = it)) })
+            SliderControl("Shadows", values.shadows, -1f..1f, source != null, { record(values.copy(shadows = it)) })
+            SliderControl("Whites", values.whites, -1f..1f, source != null, { record(values.copy(whites = it)) })
+            SliderControl("Blacks", values.blacks, -1f..1f, source != null, { record(values.copy(blacks = it)) })
+            SliderControl("Temperature", values.temperature, -1f..1f, source != null, { record(values.copy(temperature = it)) })
+            SliderControl("Tint", values.tint, -1f..1f, source != null, { record(values.copy(tint = it)) })
+
+            Spacer(Modifier.height(12.dp)); SectionTitle("HSL COLOR MIXER")
+            SliderControl("Hue", values.hue, -1f..1f, source != null, { record(values.copy(hue = it)) })
+            SliderControl("Red channel", values.redHsl, -1f..1f, source != null, { record(values.copy(redHsl = it)) })
+            SliderControl("Green channel", values.greenHsl, -1f..1f, source != null, { record(values.copy(greenHsl = it)) })
+            SliderControl("Blue channel", values.blueHsl, -1f..1f, source != null, { record(values.copy(blueHsl = it)) })
+
+            Spacer(Modifier.height(12.dp)); SectionTitle("DETAIL")
+            SliderControl("Sharpening", values.sharpness, 0f..1f, source != null, { record(values.copy(sharpness = it)) })
+            SliderControl("Clarity", values.clarity, 0f..1f, source != null, { record(values.copy(clarity = it)) })
+
+            Spacer(Modifier.height(12.dp)); SectionTitle("MASKING 鈥� RADIAL SELECTIVE ADJUSTMENT")
+            Text("A soft circular mask brightens or darkens the centre region.", color = Muted, fontSize = 10.sp)
+            SliderControl("Mask strength", values.maskStrength, -1f..1f, source != null, { record(values.copy(maskStrength = it)) })
+            SliderControl("Mask size", values.maskSize, 0.1f..1f, source != null, { record(values.copy(maskSize = it)) }, 0.55f, true)
+
+            Spacer(Modifier.height(12.dp)); SectionTitle("EFFECTS")
+            SliderControl("Vignette", values.vignette, 0f..1f, source != null, { record(values.copy(vignette = it)) })
+            SliderControl("Film grain", values.grain, 0f..1f, source != null, { record(values.copy(grain = it)) })
+            SliderControl("Soft blur", values.blur, 0f..1f, source != null, { record(values.copy(blur = it)) })
+
+            Spacer(Modifier.height(12.dp)); SectionTitle("CROP & GEOMETRY")
+            Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                listOf("Original" to 0, "Square" to 1, "4:5" to 2, "16:9" to 3).forEach { item ->
+                    FilterChip(selected = values.crop == item.second, onClick = { if (source != null) record(values.copy(crop = item.second)) }, label = { Text(item.first, fontSize = 10.sp) }, enabled = source != null)
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                OutlinedButton(onClick = { if (source != null) record(values.copy(rotation = (values.rotation + 270) % 360)) }, enabled = source != null, modifier = Modifier.weight(1f)) { Text("鈫� Rotate") }
+                OutlinedButton(onClick = { if (source != null) record(values.copy(rotation = (values.rotation + 90) % 360)) }, enabled = source != null, modifier = Modifier.weight(1f)) { Text("Rotate 鈫�") }
             }
 
+            Spacer(Modifier.height(12.dp)); SectionTitle("PRESETS")
+            Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                (builtInPresets + customPresets).forEach { preset ->
+                    FilterChip(
+                        selected = values == preset.values,
+                        onClick = { if (source != null) record(preset.values) },
+                        label = { Text(preset.name, fontSize = 10.sp) },
+                        enabled = source != null
+                    )
+                }
+            }
             OutlinedButton(
                 onClick = {
-                    if (historyIndex < history.lastIndex) {
-                        historyIndex++
-                        values = history[historyIndex]
+                    if (source != null) {
+                        customPresets = (customPresets + Preset("Custom ${customPresets.size + 1}", values)).takeLast(8)
+                        message = "Preset saved for this editing session."
                     }
                 },
-                enabled = originalBitmap != null && historyIndex < history.lastIndex,
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("↷ Redo")
-            }
-
-            OutlinedButton(
-                onClick = {
-                    if (originalBitmap != null) {
-                        applyEdit(EditValues())
-                        showOriginal = false
-                    }
-                },
-                enabled = originalBitmap != null,
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Reset")
-            }
-        }
-
-        OutlinedButton(
-            onClick = { showOriginal = !showOriginal },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 3.dp),
-            enabled = originalBitmap != null
-        ) {
-            Text(if (showOriginal) "Show Edited Photo" else "Before / After")
-        }
-
-        // Scrollable editing controls, while preview remains visible.
-        Column(
-            Modifier
-                .weight(1.1f)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(top = 12.dp, bottom = 18.dp)
-        ) {
-            SectionTitle("BASIC LIGHT & COLOR")
-
-            EditSlider(
-                "Brightness", values.brightness,
-                "${(values.brightness * 100).toInt()}",
-                -1f..1f, originalBitmap != null,
-                {
-                    showOriginal = false
-                    values = values.copy(brightness = it)
-                },
-                { applyEdit(values) }
-            )
-
-            EditSlider(
-                "Contrast", values.contrast,
-                "${(values.contrast * 100).toInt()}%",
-                0f..2f, originalBitmap != null,
-                {
-                    showOriginal = false
-                    values = values.copy(contrast = it)
-                },
-                { applyEdit(values) }
-            )
-
-            EditSlider(
-                "Saturation", values.saturation,
-                "${(values.saturation * 100).toInt()}%",
-                0f..2f, originalBitmap != null,
-                {
-                    showOriginal = false
-                    values = values.copy(saturation = it)
-                },
-                { applyEdit(values) }
-            )
-
-            Spacer(Modifier.height(18.dp))
-            SectionTitle("PROFESSIONAL LIGHT & EXPOSURE")
-
-            EditSlider(
-                "Exposure", values.exposure,
-                String.format("%.2f EV", values.exposure),
-                -2f..2f, originalBitmap != null,
-                {
-                    showOriginal = false
-                    values = values.copy(exposure = it)
-                },
-                { applyEdit(values) }
-            )
-
-            EditSlider(
-                "Highlights", values.highlights,
-                "${(values.highlights * 100).toInt()}",
-                -1f..1f, originalBitmap != null,
-                {
-                    showOriginal = false
-                    values = values.copy(highlights = it)
-                },
-                { applyEdit(values) }
-            )
-
-            EditSlider(
-                "Shadows", values.shadows,
-                "${(values.shadows * 100).toInt()}",
-                -1f..1f, originalBitmap != null,
-                {
-                    showOriginal = false
-                    values = values.copy(shadows = it)
-                },
-                { applyEdit(values) }
-            )
-
-            EditSlider(
-                "Whites", values.whites,
-                "${(values.whites * 100).toInt()}",
-                -1f..1f, originalBitmap != null,
-                {
-                    showOriginal = false
-                    values = values.copy(whites = it)
-                },
-                { applyEdit(values) }
-            )
-
-            EditSlider(
-                "Blacks", values.blacks,
-                "${(values.blacks * 100).toInt()}",
-                -1f..1f, originalBitmap != null,
-                {
-                    showOriginal = false
-                    values = values.copy(blacks = it)
-                },
-                { applyEdit(values) }
-            )
-
-            Spacer(Modifier.height(18.dp))
-            SectionTitle("WHITE BALANCE")
-
-            EditSlider(
-                "Temperature", values.temperature,
-                "${(values.temperature * 100).toInt()}",
-                -1f..1f, originalBitmap != null,
-                {
-                    showOriginal = false
-                    values = values.copy(temperature = it)
-                },
-                { applyEdit(values) }
-            )
-
-            EditSlider(
-                "Tint", values.tint,
-                "${(values.tint * 100).toInt()}",
-                -1f..1f, originalBitmap != null,
-                {
-                    showOriginal = false
-                    values = values.copy(tint = it)
-                },
-                { applyEdit(values) }
-            )
-
-            Spacer(Modifier.height(18.dp))
-            SectionTitle("MORE PROFESSIONAL TOOLS")
-
-            ToolRow("◐", "Light & Exposure", "Exposure and tonal controls")
-            Spacer(Modifier.height(8.dp))
-            ToolRow("◈", "Color Mixer", "Advanced HSL controls planned")
-            Spacer(Modifier.height(8.dp))
-            ToolRow("◇", "Masking", "Brush, gradients and selections planned")
-            Spacer(Modifier.height(8.dp))
-            ToolRow("◎", "Detail", "Sharpening and noise reduction planned")
-            Spacer(Modifier.height(8.dp))
-            ToolRow("⌑", "Crop & Geometry", "Crop, rotate and perspective planned")
-            Spacer(Modifier.height(8.dp))
-            ToolRow("✧", "Effects", "Texture, clarity, grain and vignette planned")
-            Spacer(Modifier.height(8.dp))
-            ToolRow("◉", "Presets", "Save and apply editing styles planned")
+                enabled = source != null, modifier = Modifier.fillMaxWidth()
+            ) { Text("Save Current Preset") }
+            Text("Note: custom presets are kept only while this editor screen remains open. Export creates a flattened JPG copy.", color = Muted, fontSize = 10.sp)
         }
     }
 }
 
 @Composable
-private fun EditSlider(
+private fun SliderControl(
     title: String,
     value: Float,
-    valueText: String,
     range: ClosedFloatingPointRange<Float>,
     enabled: Boolean,
-    onValueChange: (Float) -> Unit,
-    onFinished: () -> Unit
+    onCommit: (Float) -> Unit,
+    default: Float = 0f,
+    percent: Boolean = false
 ) {
-    Column {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(title, color = White, fontSize = 14.sp)
-            Text(valueText, color = Accent, fontSize = 11.sp)
+    var moving by remember(title) { mutableFloatStateOf(value) }
+    LaunchedEffect(value) { if (!moving.isNaN()) moving = value }
+    Column(Modifier.padding(bottom = 3.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(title, color = White, fontSize = 12.sp)
+            Text(if (percent) "${(value * 100).toInt()}%" else String.format("%.2f", value), color = Accent, fontSize = 10.sp)
         }
-
         Slider(
-            value = value,
-            onValueChange = onValueChange,
-            onValueChangeFinished = onFinished,
+            value = value.coerceIn(range.start, range.endInclusive),
+            onValueChange = { onCommit(it) },
             valueRange = range,
             enabled = enabled,
-            colors = SliderDefaults.colors(
-                thumbColor = Accent,
-                activeTrackColor = Accent
-            )
+            colors = SliderDefaults.colors(thumbColor = Accent, activeTrackColor = Accent)
         )
     }
 }
 
-private fun channelMatrix(
-    redGain: Float = 1f,
-    greenGain: Float = 1f,
-    blueGain: Float = 1f,
-    redOffset: Float = 0f,
-    greenOffset: Float = 0f,
-    blueOffset: Float = 0f
-): ColorMatrix {
-    return ColorMatrix(
-        floatArrayOf(
-            redGain, 0f, 0f, 0f, redOffset,
-            0f, greenGain, 0f, 0f, greenOffset,
-            0f, 0f, blueGain, 0f, blueOffset,
-            0f, 0f, 0f, 1f, 0f
-        )
-    )
-}
-
-private fun createEditColorMatrix(values: EditValues): ColorMatrix {
-    val saturation = values.saturation
-    val sr = (1f - saturation) * 0.213f
-    val sg = (1f - saturation) * 0.715f
-    val sb = (1f - saturation) * 0.072f
-
-    val saturationMatrix = ColorMatrix(
-        floatArrayOf(
-            sr + saturation, sg, sb, 0f, 0f,
-            sr, sg + saturation, sb, 0f, 0f,
-            sr, sg, sb + saturation, 0f, 0f,
-            0f, 0f, 0f, 1f, 0f
-        )
-    )
-
-    val contrast = values.contrast
-    val exposureGain = 2.0.pow(values.exposure.toDouble()).toFloat()
-
-    val baseOffset = values.brightness * 255f + 128f * (1f - contrast)
-
-    val exposureMatrix = channelMatrix(
-        redGain = exposureGain,
-        greenGain = exposureGain,
-        blueGain = exposureGain
-    )
-
-    val contrastMatrix = channelMatrix(
-        redGain = contrast,
-        greenGain = contrast,
-        blueGain = contrast,
-        redOffset = baseOffset,
-        greenOffset = baseOffset,
-        blueOffset = baseOffset
-    )
-
-    val highlightGain = 1f + values.highlights * 0.18f
-    val shadowOffset = values.shadows * 32f
-    val whiteOffset = values.whites * 28f
-    val blackOffset = values.blacks * 28f
-
-    val tonalMatrix = channelMatrix(
-        redGain = highlightGain,
-        greenGain = highlightGain,
-        blueGain = highlightGain,
-        redOffset = shadowOffset + whiteOffset + blackOffset,
-        greenOffset = shadowOffset + whiteOffset + blackOffset,
-        blueOffset = shadowOffset + whiteOffset + blackOffset
-    )
-
-    val temperatureOffset = values.temperature * 24f
-    val tintOffset = values.tint * 18f
-
-    val whiteBalanceMatrix = channelMatrix(
-        redOffset = temperatureOffset - tintOffset * 0.5f,
-        greenOffset = tintOffset,
-        blueOffset = -temperatureOffset - tintOffset * 0.5f
-    )
-
-    val result = ColorMatrix(saturationMatrix.values)
-    result *= exposureMatrix
-    result *= contrastMatrix
-    result *= tonalMatrix
-    result *= whiteBalanceMatrix
-
-    return result
-}
-
-@Composable
-fun ToolRow(icon: String, title: String, subtitle: String) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(15.dp))
-            .background(Panel)
-            .padding(15.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(icon, color = Accent, fontSize = 24.sp)
-        Spacer(Modifier.width(14.dp))
-        Column {
-            Text(title, color = White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-            Text(subtitle, color = Muted, fontSize = 10.sp)
-        }
-    }
-}
-
-// ---------------------------------------------------------
-// AI STUDIO
-// ---------------------------------------------------------
-
-@Composable
-fun AIStudioScreen() {
-    ScreenColumn {
-        Header("AI STUDIO", "INTELLIGENT CREATIVE TOOLS")
-        Spacer(Modifier.height(25.dp))
-
-        Text(
-            "Imagine. Create. Transform.",
-            color = White,
-            fontSize = 25.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Text("Explore the AI creative workspace.", color = Muted, fontSize = 13.sp)
-
-        Spacer(Modifier.height(22.dp))
-
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(22.dp))
-                .background(
-                    Brush.linearGradient(
-                        listOf(Color(0xFF49336E), Color(0xFF1B4553))
-                    )
-                )
-                .padding(22.dp)
-        ) {
-            Column {
-                Text("✦ AI CREATIVE LAB", color = Color(0xFFE0D2FF), fontSize = 11.sp)
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    "Your ideas,\nreimagined.",
-                    color = White,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "A home for intelligent photo creation.",
-                    color = Color.LightGray,
-                    fontSize = 12.sp
-                )
-            }
-        }
-
-        Spacer(Modifier.height(25.dp))
-        SectionTitle("AI TOOLS")
-
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            ToolRow("✦", "AI Image Generator", "Text-to-image creation")
-            ToolRow("◈", "Background Removal", "Separate subject from background")
-            ToolRow("◎", "AI Enhancement", "Improve image details")
-            ToolRow("◇", "Object Removal", "Intelligent object editing")
-            ToolRow("✧", "Portrait Studio", "Portrait editing tools")
-            ToolRow("▧", "AI Upscale", "High-resolution enhancement")
-            ToolRow("◐", "AI Relight", "Creative lighting controls")
-            ToolRow("⌑", "Generative Expand", "Expand image composition")
-        }
-
-        Spacer(Modifier.height(20.dp))
-        Text(
-            "AI tools are interface previews. Actual AI processing requires implementation and an AI service.",
-            color = Muted,
-            fontSize = 11.sp
-        )
-        Spacer(Modifier.height(25.dp))
-    }
-}
-
-// ---------------------------------------------------------
-// PROJECTS
-// ---------------------------------------------------------
-
-@Composable
-fun ProjectsScreen() {
-    ScreenColumn {
-        Header("MY PROJECTS", "YOUR CREATIVE LIBRARY")
-        Spacer(Modifier.height(25.dp))
-
-        Text(
-            "Your workspace.",
-            color = White,
-            fontSize = 25.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Text("All your creations in one place.", color = Muted, fontSize = 13.sp)
-
-        Spacer(Modifier.height(25.dp))
-
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(240.dp)
-                .clip(RoundedCornerShape(22.dp))
-                .background(Panel),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("▤", color = Accent, fontSize = 50.sp)
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    "No projects yet",
-                    color = White,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    "Your saved projects will appear here.",
-                    color = Muted,
-                    fontSize = 12.sp
-                )
-            }
-        }
-
-        Spacer(Modifier.height(25.dp))
-        SectionTitle("PROJECT CATEGORIES")
-        ToolRow("▧", "Edited Photos", "Your photo editing projects")
-        Spacer(Modifier.height(10.dp))
-        ToolRow("✧", "AI Creations", "Your AI-generated work")
-        Spacer(Modifier.height(10.dp))
-        ToolRow("◈", "Presets", "Your saved editing styles")
-        Spacer(Modifier.height(25.dp))
-    }
-}
-
-// ---------------------------------------------------------
-// PROFILE
-// ---------------------------------------------------------
-
-@Composable
-fun ProfileScreen() {
-    ScreenColumn {
-        Header("PROFILE & SETTINGS", "PERSONALIZE YOUR STUDIO")
-        Spacer(Modifier.height(28.dp))
-
-        Box(
-            Modifier
-                .size(82.dp)
-                .clip(CircleShape)
-                .background(Panel2),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("◉", color = Accent, fontSize = 38.sp)
-        }
-
-        Spacer(Modifier.height(14.dp))
-        Text(
-            "Creative User",
-            color = White,
-            fontSize = 21.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Text("Welcome to Pro Photo Studio", color = Muted, fontSize = 12.sp)
-
-        Spacer(Modifier.height(30.dp))
-        SectionTitle("APP SETTINGS")
-
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            ToolRow("◐", "Appearance", "Theme and interface preferences")
-            ToolRow("⚙", "General Settings", "App preferences")
-            ToolRow("⇩", "Storage", "Local files and cache")
-            ToolRow("☷", "Export Settings", "Image quality and formats")
-            ToolRow("◈", "About", "App version and information")
-        }
-
-        Spacer(Modifier.height(25.dp))
-        Text(
-            "PRO PHOTO STUDIO",
-            color = Accent,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Text("Creative tools. One studio.", color = Muted, fontSize = 11.sp)
-        Spacer(Modifier.height(25.dp))
-    }
-}
-
-// ---------------------------------------------------------
-// BITMAP LOADER
-// ---------------------------------------------------------
-
-private fun loadPreviewBitmap(
-    context: Context,
-    uri: Uri
-): Bitmap? {
+private fun loadBitmap(context: Context, uri: Uri): Bitmap? {
     return try {
         val resolver = context.contentResolver
-
-        val bounds = BitmapFactory.Options().apply {
-            inJustDecodeBounds = true
-        }
-
-        resolver.openInputStream(uri)?.use {
-            BitmapFactory.decodeStream(it, null, bounds)
-        }
-
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
-            return null
+            null
+        } else {
+            var sample = 1
+            while (bounds.outWidth / sample > 1600 || bounds.outHeight / sample > 1600) sample *= 2
+            val options = BitmapFactory.Options().apply {
+                inSampleSize = sample
+                inPreferredConfig = Bitmap.Config.ARGB_8888
+            }
+            resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
         }
-
-        var sampleSize = 1
-
-        while (
-            bounds.outWidth / sampleSize > 2048 ||
-            bounds.outHeight / sampleSize > 2048
-        ) {
-            sampleSize *= 2
-        }
-
-        val options = BitmapFactory.Options().apply {
-            inSampleSize = sampleSize
-        }
-
-        resolver.openInputStream(uri)?.use {
-            BitmapFactory.decodeStream(it, null, options)
-        }
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         null
     }
+}
+
+private fun renderBitmap(input: Bitmap, v: EditValues): Bitmap {
+    var working = input
+    if (v.crop != 0) {
+        val w = working.width
+        val h = working.height
+        val targetRatio = when (v.crop) { 1 -> 1f; 2 -> 4f / 5f; else -> 16f / 9f }
+        val current = w.toFloat() / h
+        val cropW: Int
+        val cropH: Int
+        if (current > targetRatio) { cropH = h; cropW = (h * targetRatio).toInt().coerceAtLeast(1) }
+        else { cropW = w; cropH = (w / targetRatio).toInt().coerceAtLeast(1) }
+        working = Bitmap.createBitmap(input, (w - cropW) / 2, (h - cropH) / 2, cropW, cropH)
+    }
+    if (v.rotation != 0) {
+        val matrix = Matrix().apply { postRotate(v.rotation.toFloat()) }
+        working = Bitmap.createBitmap(working, 0, 0, working.width, working.height, matrix, true)
+    }
+    val w = working.width
+    val h = working.height
+    val pixels = IntArray(w * h)
+    working.getPixels(pixels, 0, w, 0, 0, w, h)
+    val original = pixels.copyOf()
+    val exposure = 2.0.pow(v.exposure.toDouble()).toFloat()
+    val contrast = v.contrast
+    val brightness = v.brightness * 255f
+    val seed = 193
+    for (y in 0 until h) {
+        for (x in 0 until w) {
+            val i = y * w + x
+            val c = original[i]
+            var r = ((c shr 16) and 255).toFloat()
+            var g = ((c shr 8) and 255).toFloat()
+            var b = (c and 255).toFloat()
+            r = (r - 128f) * contrast + 128f + brightness
+            g = (g - 128f) * contrast + 128f + brightness
+            b = (b - 128f) * contrast + 128f + brightness
+            r *= exposure; g *= exposure; b *= exposure
+            val lum = (0.213f * r + 0.715f * g + 0.072f * b).coerceIn(0f, 255f)
+            val shadowWeight = (1f - lum / 255f).coerceIn(0f, 1f)
+            val highlightWeight = (lum / 255f).coerceIn(0f, 1f)
+            val tonal = v.shadows * 48f * shadowWeight + v.highlights * 48f * highlightWeight + v.whites * 32f * highlightWeight + v.blacks * 32f * shadowWeight
+            r += tonal + v.temperature * 25f - v.tint * 10f
+            g += tonal + v.tint * 18f
+            b += tonal - v.temperature * 25f - v.tint * 10f
+            val avg = (r + g + b) / 3f
+            r = avg + (r - avg) * v.saturation
+            g = avg + (g - avg) * v.saturation
+            b = avg + (b - avg) * v.saturation
+
+            val nx = (x.toFloat() / w - 0.5f) * 2f
+            val ny = (y.toFloat() / h - 0.5f) * 2f
+            val radius = sqrt(nx * nx + ny * ny)
+            val maskRadius = v.maskSize.coerceIn(0.1f, 1f)
+            val mask = (1f - radius / maskRadius).coerceIn(0f, 1f)
+            val feather = mask * mask * (3f - 2f * mask)
+            val selective = v.maskStrength * feather * 55f
+            r += selective; g += selective; b += selective
+
+            val edge = ((radius - 0.25f) / 1.15f).coerceIn(0f, 1f)
+            val vignetteFactor = 1f - v.vignette * edge * 0.75f
+            r *= vignetteFactor; g *= vignetteFactor; b *= vignetteFactor
+
+            if (v.hue != 0f || v.redHsl != 0f || v.greenHsl != 0f || v.blueHsl != 0f) {
+                val maxC = max(r, max(g, b))
+                val minC = min(r, min(g, b))
+                val delta = maxC - minC
+                var hue = if (delta == 0f) 0f else when (maxC) {
+                    r -> 60f * (((g - b) / delta) % 6f)
+                    g -> 60f * ((b - r) / delta + 2f)
+                    else -> 60f * ((r - g) / delta + 4f)
+                }
+                hue = (hue + 360f) % 360f
+                hue = (hue + v.hue * 45f + 360f) % 360f
+                val channelAdjust = when {
+                    hue < 45f || hue >= 330f -> v.redHsl
+                    hue in 75f..165f -> v.greenHsl
+                    hue in 190f..275f -> v.blueHsl
+                    else -> 0f
+                }
+                val saturation = if (maxC == 0f) 0f else delta / maxC
+                val adjusted = (saturation * (1f + channelAdjust * 0.8f)).coerceIn(0f, 1f)
+                val factor = if (saturation > 0.001f) adjusted / saturation else 1f
+                r = avg + (r - avg) * factor
+                g = avg + (g - avg) * factor
+                b = avg + (b - avg) * factor
+            }
+            if (v.grain > 0f) {
+                val noise = (((i * 1103515245L + seed * 12345L) shr 16).toInt() and 255) / 127.5f - 1f
+                val amount = noise * v.grain * 22f
+                r += amount; g += amount; b += amount
+            }
+            pixels[i] = android.graphics.Color.argb(
+                android.graphics.Color.alpha(c),
+                r.roundToInt().coerceIn(0, 255),
+                g.roundToInt().coerceIn(0, 255),
+                b.roundToInt().coerceIn(0, 255)
+            )
+        }
+    }
+    if (v.sharpness > 0f || v.clarity > 0f) {
+        val strength = (v.sharpness * 0.8f + v.clarity * 0.35f).coerceAtMost(1.1f)
+        val copy = pixels.copyOf()
+        for (y in 1 until h - 1) for (x in 1 until w - 1) {
+            val i = y * w + x
+            val center = copy[i]
+            val neighbours = intArrayOf(copy[i - 1], copy[i + 1], copy[i - w], copy[i + w])
+            fun channel(shift: Int): Int {
+                val cv = (center shr shift) and 255
+                val avg = neighbours.map { (it shr shift) and 255 }.average().toFloat()
+                return (cv + (cv - avg) * strength).roundToInt().coerceIn(0, 255)
+            }
+            pixels[i] = android.graphics.Color.argb(255, channel(16), channel(8), channel(0))
+        }
+    }
+    if (v.blur > 0f && w > 2 && h > 2) {
+        val copy = pixels.copyOf()
+        val radius = if (v.blur > 0.65f) 2 else 1
+        for (y in 1 until h - 1) for (x in 1 until w - 1) {
+            val i = y * w + x
+            val c = copy[i]
+            fun avgChannel(shift: Int): Int {
+                var sum = 0
+                var count = 0
+                for (dy in -radius..radius) for (dx in -radius..radius) {
+                    sum += (copy[(y + dy).coerceIn(0, h - 1) * w + (x + dx).coerceIn(0, w - 1)] shr shift) and 255
+                    count++
+                }
+                val blurred = sum / count
+                val base = (c shr shift) and 255
+                return (base * (1f - v.blur) + blurred * v.blur).roundToInt().coerceIn(0, 255)
+            }
+            pixels[i] = android.graphics.Color.argb(255, avgChannel(16), avgChannel(8), avgChannel(0))
+        }
+    }
+    return Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).also { it.setPixels(pixels, 0, w, 0, 0, w, h) }
+}
+
+private fun saveBitmap(context: Context, bitmap: Bitmap): Uri? {
+    return try {
+        val name = "ProPhotoStudio_${System.currentTimeMillis()}.jpg"
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, name)
+            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/ProPhotoStudio")
+                put(MediaStore.Images.Media.IS_PENDING, 1)
+            }
+        }
+        val resolver = context.contentResolver
+        val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return null
+        val written = resolver.openOutputStream(uri)?.use { stream ->
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 95, stream)
+        } ?: false
+        if (!written) {
+            resolver.delete(uri, null, null)
+            return null
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val finish = ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }
+            resolver.update(uri, finish, null, null)
+        }
+        uri
+    } catch (_: Exception) { null }
 }
