@@ -1,4 +1,5 @@
-package com.prophotostudio.app
+package com.dhanesh.prostudiopro
+
 
 import android.content.ContentValues
 import android.content.Context
