@@ -1,4 +1,5 @@
 package com.prophotostudio.app
+import androidx.activity.result.PickVisualMediaRequest
 
 import android.content.ContentValues
 import android.content.Context
