@@ -925,7 +925,7 @@ private fun createEditColorMatrix(values: EditValues): ColorMatrix {
         blueOffset = -temperatureOffset - tintOffset * 0.5f
     )
 
-    val result = ColorMatrix(saturationMatrix)
+    val result = ColorMatrix(saturationMatrix.values)
     result *= exposureMatrix
     result *= contrastMatrix
     result *= tonalMatrix
