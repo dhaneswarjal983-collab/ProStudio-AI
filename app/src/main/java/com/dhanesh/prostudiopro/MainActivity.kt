@@ -26,6 +26,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -109,16 +115,22 @@ fun ProPhotoStudioApp() {
                     Modifier.fillMaxWidth().background(Panel).navigationBarsPadding().padding(vertical = 9.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    listOf("鈱�" to "Home", "鈻�" to "Edit", "鉁�" to "AI Studio", "鈻�" to "Projects", "鈼�" to "Profile")
-                        .forEachIndexed { index, item ->
-                            Column(
-                                Modifier.clip(RoundedCornerShape(12.dp)).clickable { tab = index }.padding(horizontal = 9.dp, vertical = 3.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(item.first, color = if (tab == index) Accent else Muted, fontSize = 21.sp)
-                                Text(item.second, color = if (tab == index) Accent else Muted, fontSize = 9.sp)
-                            }
+                    listOf(
+                        Triple(Icons.Filled.Home, "Home", 0),
+                        Triple(Icons.Filled.Edit, "Edit", 1),
+                        Triple(Icons.Filled.AutoAwesome, "AI Studio", 2),
+                        Triple(Icons.Filled.FolderOpen, "Projects", 3),
+                        Triple(Icons.Filled.Person, "Profile", 4)
+                    ).forEach { item ->
+                        val selected = tab == item.third
+                        Column(
+                            Modifier.clip(RoundedCornerShape(12.dp)).clickable { tab = item.third }.padding(horizontal = 9.dp, vertical = 3.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(item.first, contentDescription = item.second, tint = if (selected) Accent else Muted, modifier = Modifier.size(21.dp))
+                            Text(item.second, color = if (selected) Accent else Muted, fontSize = 9.sp)
                         }
+                    }
                 }
             }
         ) { padding ->
@@ -148,7 +160,7 @@ private fun Header(title: String, subtitle: String) {
             Text(title, color = White, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
             Text(subtitle, color = Muted, fontSize = 9.sp, letterSpacing = 2.sp)
         }
-        Text("鉁� PRO", color = Accent, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+        Text("PRO", color = Accent, fontWeight = FontWeight.Bold, fontSize = 13.sp)
     }
 }
 
@@ -176,17 +188,17 @@ private fun HomeScreen(onEdit: () -> Unit, onAI: () -> Unit, onProjects: () -> U
                 Text("Make every\npixel matter.", color = White, fontSize = 27.sp, fontWeight = FontWeight.Bold)
                 Text("Edit, enhance and export photos", color = Color.LightGray, fontSize = 12.sp)
             }
-            Text("鉁�", Modifier.align(Alignment.TopEnd), color = White, fontSize = 42.sp)
+            Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.align(Alignment.TopEnd).size(42.dp), tint = White)
         }
         Spacer(Modifier.height(24.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            HomeCard(Modifier.weight(1f), "鈻�", "Photo Editor", "Edit photos", onEdit)
-            HomeCard(Modifier.weight(1f), "鉁�", "AI Studio", "Service required", onAI)
+            HomeCard(Modifier.weight(1f), "✎", "Photo Editor", "Edit photos", onEdit)
+            HomeCard(Modifier.weight(1f), "✦", "AI Studio", "Service required", onAI)
         }
         Spacer(Modifier.height(18.dp))
         Text("YOUR WORKSPACE", color = Muted, fontSize = 11.sp)
         Spacer(Modifier.height(8.dp))
-        HomeCard(Modifier.fillMaxWidth(), "鈻�", "Projects & exports", "Open workspace information", onProjects)
+        HomeCard(Modifier.fillMaxWidth(), "▣", "Projects & exports", "Open workspace information", onProjects)
         Spacer(Modifier.height(24.dp))
     }
 }
@@ -270,13 +282,13 @@ private fun EditorScreen() {
     }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 13.dp)) {
-        Header("PHOTO EDITOR", "STAGE 5 鈥� COMPLETE EDITING WORKSPACE")
+        Header("PHOTO EDITOR", "STAGE 5 - COMPLETE EDITING WORKSPACE")
         Row(Modifier.fillMaxWidth().padding(top = 9.dp, bottom = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("LIVE PREVIEW", color = Muted, fontSize = 10.sp)
             Text(if (before) "ORIGINAL" else "EDITED", color = Accent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
         }
         Box(
-            Modifier.fillMaxWidth().weight(0.85f).clip(RoundedCornerShape(18.dp)).background(Panel2),
+            Modifier.fillMaxWidth().height(240.dp).clip(RoundedCornerShape(18.dp)).background(Panel2),
             contentAlignment = Alignment.Center
         ) {
             val shown = if (before) source else preview
@@ -304,7 +316,7 @@ private fun EditorScreen() {
                 )
             } else {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("鈻�", color = Accent, fontSize = 48.sp)
+                    Icon(Icons.Filled.Edit, contentDescription = null, tint = Accent, modifier = Modifier.size(48.dp))
                     Text("Select a photo to begin", color = White)
                     Text("Your original image remains unchanged", color = Muted, fontSize = 11.sp)
                 }
@@ -322,17 +334,17 @@ private fun EditorScreen() {
             modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Accent),
             shape = RoundedCornerShape(12.dp)
-        ) { Text(if (source == null) "锛� Select Photo" else "鈻� Change Photo", color = Background, fontWeight = FontWeight.Bold) }
+        ) { Text(if (source == null) "Select Photo" else "Change Photo", color = Background, fontWeight = FontWeight.Bold) }
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             OutlinedButton(
                 onClick = { if (historyIndex > 0) { historyIndex--; values = history[historyIndex] } },
                 enabled = source != null && historyIndex > 0, modifier = Modifier.weight(1f)
-            ) { Text("鈫� Undo") }
+            ) { Text("Undo") }
             OutlinedButton(
                 onClick = { if (historyIndex < history.lastIndex) { historyIndex++; values = history[historyIndex] } },
                 enabled = source != null && historyIndex < history.lastIndex, modifier = Modifier.weight(1f)
-            ) { Text("鈫� Redo") }
+            ) { Text("Redo") }
             OutlinedButton(onClick = { if (source != null) record(EditValues()) }, enabled = source != null, modifier = Modifier.weight(1f)) { Text("Reset") }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -381,7 +393,7 @@ private fun EditorScreen() {
             SliderControl("Sharpening", values.sharpness, 0f..1f, source != null, { record(values.copy(sharpness = it)) })
             SliderControl("Clarity", values.clarity, 0f..1f, source != null, { record(values.copy(clarity = it)) })
 
-            Spacer(Modifier.height(12.dp)); SectionTitle("MASKING 鈥� RADIAL SELECTIVE ADJUSTMENT")
+            Spacer(Modifier.height(12.dp)); SectionTitle("MASKING - RADIAL SELECTIVE ADJUSTMENT")
             Text("A soft circular mask brightens or darkens the centre region.", color = Muted, fontSize = 10.sp)
             SliderControl("Mask strength", values.maskStrength, -1f..1f, source != null, { record(values.copy(maskStrength = it)) })
             SliderControl("Mask size", values.maskSize, 0.1f..1f, source != null, { record(values.copy(maskSize = it)) }, 0.55f, true)
@@ -398,8 +410,8 @@ private fun EditorScreen() {
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                OutlinedButton(onClick = { if (source != null) record(values.copy(rotation = (values.rotation + 270) % 360)) }, enabled = source != null, modifier = Modifier.weight(1f)) { Text("鈫� Rotate") }
-                OutlinedButton(onClick = { if (source != null) record(values.copy(rotation = (values.rotation + 90) % 360)) }, enabled = source != null, modifier = Modifier.weight(1f)) { Text("Rotate 鈫�") }
+                OutlinedButton(onClick = { if (source != null) record(values.copy(rotation = (values.rotation + 270) % 360)) }, enabled = source != null, modifier = Modifier.weight(1f)) { Text("Rotate Left") }
+                OutlinedButton(onClick = { if (source != null) record(values.copy(rotation = (values.rotation + 90) % 360)) }, enabled = source != null, modifier = Modifier.weight(1f)) { Text("Rotate Right") }
             }
 
             Spacer(Modifier.height(12.dp)); SectionTitle("PRESETS")
