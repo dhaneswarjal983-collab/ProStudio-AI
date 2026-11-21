@@ -342,7 +342,7 @@ private fun EditorScreen() {
                 Text(if (before) "ORIGINAL" else "EDITED", Modifier.align(Alignment.TopStart).padding(10.dp)
                     .clip(RoundedCornerShape(6.dp)).background(Color(0x99000000)).padding(horizontal = 8.dp, vertical = 5.dp),
                     color = White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                Text("\${(zoom * 100).toInt()}%", Modifier.align(Alignment.BottomEnd).padding(10.dp)
+                Text("${(zoom * 100).toInt()}%", Modifier.align(Alignment.BottomEnd).padding(10.dp)
                     .clip(RoundedCornerShape(6.dp)).background(Color(0x99000000)).clickable { resetView() }
                     .padding(horizontal = 8.dp, vertical = 5.dp), color = White, fontSize = 10.sp)
             } else {
@@ -404,7 +404,7 @@ private fun EditorScreen() {
                     }
                     OutlinedButton(onClick = {
                         if (source != null) {
-                            customPresets = (customPresets + Preset("Custom \${customPresets.size + 1}", values)).takeLast(8)
+                            customPresets = (customPresets + Preset("Custom ${customPresets.size + 1}", values)).takeLast(8)
                             message = "Preset saved for this editing session."
                         }
                     }, enabled = source != null, modifier = Modifier.fillMaxWidth()) { Text("Save Current Preset") }
