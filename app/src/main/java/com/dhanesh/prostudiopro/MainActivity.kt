@@ -17,6 +17,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.CompareArrows
@@ -124,7 +125,7 @@ fun ProPhotoStudioApp() {
         Scaffold(
             containerColor = Background,
             bottomBar = {
-                Row(
+                if (tab != 1) Row(
                     Modifier.fillMaxWidth().background(Panel).navigationBarsPadding().padding(vertical = 9.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
@@ -150,7 +151,7 @@ fun ProPhotoStudioApp() {
             Box(Modifier.fillMaxSize().padding(padding)) {
                 when (tab) {
                     0 -> HomeScreen(onEdit = { tab = 1 }, onAI = { tab = 2 }, onProjects = { tab = 3 })
-                    1 -> EditorScreen()
+                    1 -> EditorScreen(onBack = { tab = 0 })
                     2 -> SimpleScreen("AI STUDIO", "AI tools need a separately configured AI service and API key. This screen does not claim to run AI processing.")
                     3 -> SimpleScreen("MY PROJECTS", "Exported photos are saved in your device Pictures/ProPhotoStudio folder. Project-session management is not included in this single-file editor.")
                     else -> SimpleScreen("PROFILE & SETTINGS", "Pro Photo Studio\nLocal photo editing workspace")
@@ -236,7 +237,7 @@ private fun SimpleScreen(title: String, message: String) {
 }
 
 @Composable
-private fun EditorScreen() {
+private fun EditorScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var source by remember { mutableStateOf<Bitmap?>(null) }
@@ -299,6 +300,9 @@ private fun EditorScreen() {
                 Text("PHOTO EDITOR", color = Muted, fontSize = 9.sp, letterSpacing = 2.sp)
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.Filled.ArrowBack, contentDescription = "Back to Home", tint = White)
+                }
                 IconButton(onClick = { if (historyIndex > 0) { historyIndex--; values = history[historyIndex] } }, enabled = source != null && historyIndex > 0) {
                     Icon(Icons.Filled.Undo, contentDescription = "Undo", tint = if (historyIndex > 0) White else Muted)
                 }
