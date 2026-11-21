@@ -325,7 +325,7 @@ private fun EditorScreen() {
             }
         }
 
-        Box(Modifier.fillMaxWidth().weight(0.52f).clip(RoundedCornerShape(16.dp)).background(Color(0xFF080A0F)), contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxWidth().weight(0.72f).clip(RoundedCornerShape(16.dp)).background(Color(0xFF080A0F)), contentAlignment = Alignment.Center) {
             val shown = if (before) source else preview
             if (shown != null) {
                 Image(
@@ -387,7 +387,7 @@ private fun EditorScreen() {
             }
         }
 
-        Column(Modifier.fillMaxWidth().weight(0.48f).verticalScroll(rememberScrollState()).padding(top = 8.dp, bottom = 12.dp)) {
+        Column(Modifier.fillMaxWidth().weight(0.28f).verticalScroll(rememberScrollState()).padding(top = 8.dp, bottom = 12.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(selectedCategory.uppercase(), color = White, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                 Text(if (source == null) "SELECT A PHOTO FIRST" else "ADJUSTMENTS", color = Muted, fontSize = 9.sp)
