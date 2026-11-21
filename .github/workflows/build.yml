@@ -1,4 +1,4 @@
-name: Build Native Android APK - Editor UI
+name: Build Native Android APK - Large Photo Preview
 
 on:
   push:
