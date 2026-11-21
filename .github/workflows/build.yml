@@ -2,7 +2,7 @@ name: Build Native Android APK
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, fix/editor-ui-icons ]
   workflow_dispatch:
 
 jobs:
