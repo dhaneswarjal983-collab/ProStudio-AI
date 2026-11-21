@@ -1,7 +1,9 @@
-name: Build Native Android APK
+name: Build Native Android APK - Large Photo Preview
 
 on:
   push:
+    branches: [ main, fix/editor-ui-icons ]
+  pull_request:
     branches: [ main ]
   workflow_dispatch:
 
