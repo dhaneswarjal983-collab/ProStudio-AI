@@ -16,6 +16,19 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.BlurOn
+import androidx.compose.material.icons.filled.CompareArrows
+import androidx.compose.material.icons.filled.Crop
+import androidx.compose.material.icons.filled.Details
+import androidx.compose.material.icons.filled.Face
+import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Redo
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Undo
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -238,19 +251,16 @@ private fun EditorScreen() {
     var panX by remember { mutableFloatStateOf(0f) }
     var panY by remember { mutableFloatStateOf(0f) }
     var customPresets by remember { mutableStateOf(listOf<Preset>()) }
+    var selectedCategory by remember { mutableStateOf("Light") }
 
     fun record(next: EditValues) {
+        if (next == values) return
         history = (history.take(historyIndex + 1) + next).takeLast(40)
         historyIndex = history.lastIndex
         values = next
         before = false
     }
-
-    fun resetView() {
-        zoom = 1f
-        panX = 0f
-        panY = 0f
-    }
+    fun resetView() { zoom = 1f; panX = 0f; panY = 0f }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
         if (uri != null) {
@@ -281,78 +291,24 @@ private fun EditorScreen() {
         }
     }
 
-    Column(Modifier.fillMaxSize().padding(horizontal = 13.dp)) {
-        Header("PHOTO EDITOR", "STAGE 5 - COMPLETE EDITING WORKSPACE")
-        Row(Modifier.fillMaxWidth().padding(top = 9.dp, bottom = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("LIVE PREVIEW", color = Muted, fontSize = 10.sp)
-            Text(if (before) "ORIGINAL" else "EDITED", color = Accent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-        }
-        Box(
-            Modifier.fillMaxWidth().height(240.dp).clip(RoundedCornerShape(18.dp)).background(Panel2),
-            contentAlignment = Alignment.Center
-        ) {
-            val shown = if (before) source else preview
-            if (loading && shown == null) {
-                CircularProgressIndicator(color = Accent)
-            } else if (shown != null) {
-                Image(
-                    bitmap = shown.asImageBitmap(),
-                    contentDescription = "Photo preview",
-                    modifier = Modifier.fillMaxSize()
-                        .pointerInput(source) {
-                            detectTransformGestures { _, pan, zoomChange, _ ->
-                                zoom = (zoom * zoomChange).coerceIn(1f, 5f)
-                                if (zoom > 1f) {
-                                    panX += pan.x
-                                    panY += pan.y
-                                } else {
-                                    panX = 0f
-                                    panY = 0f
-                                }
-                            }
-                        }
-                        .graphicsLayer { scaleX = zoom; scaleY = zoom; translationX = panX; translationY = panY },
-                    contentScale = ContentScale.Fit
-                )
-            } else {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Filled.Edit, contentDescription = null, tint = Accent, modifier = Modifier.size(48.dp))
-                    Text("Select a photo to begin", color = White)
-                    Text("Your original image remains unchanged", color = Muted, fontSize = 11.sp)
+    val categories = listOf("Presets", "Retouch", "Crop", "Light", "Color", "Effects", "Detail", "Mask")
+    Column(Modifier.fillMaxSize().background(Background).padding(horizontal = 12.dp)) {
+        Row(Modifier.fillMaxWidth().height(52.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Column {
+                Text("PRO PHOTO STUDIO", color = White, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Text("PHOTO EDITOR", color = Muted, fontSize = 9.sp, letterSpacing = 2.sp)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { if (historyIndex > 0) { historyIndex--; values = history[historyIndex] } }, enabled = source != null && historyIndex > 0) {
+                    Icon(Icons.Filled.Undo, contentDescription = "Undo", tint = if (historyIndex > 0) White else Muted)
                 }
-            }
-        }
-        if (source != null) {
-            Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Zoom ${(zoom * 100).toInt()}%", color = Muted, fontSize = 10.sp)
-                Text("RESET ZOOM", color = Accent, fontSize = 10.sp, modifier = Modifier.clickable { resetView() })
-            }
-        }
-        Button(
-            onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-            enabled = !loading,
-            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Accent),
-            shape = RoundedCornerShape(12.dp)
-        ) { Text(if (source == null) "Select Photo" else "Change Photo", color = Background, fontWeight = FontWeight.Bold) }
-
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            OutlinedButton(
-                onClick = { if (historyIndex > 0) { historyIndex--; values = history[historyIndex] } },
-                enabled = source != null && historyIndex > 0, modifier = Modifier.weight(1f)
-            ) { Text("Undo") }
-            OutlinedButton(
-                onClick = { if (historyIndex < history.lastIndex) { historyIndex++; values = history[historyIndex] } },
-                enabled = source != null && historyIndex < history.lastIndex, modifier = Modifier.weight(1f)
-            ) { Text("Redo") }
-            OutlinedButton(onClick = { if (source != null) record(EditValues()) }, enabled = source != null, modifier = Modifier.weight(1f)) { Text("Reset") }
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            OutlinedButton(onClick = { before = !before }, enabled = source != null, modifier = Modifier.weight(1f)) {
-                Text(if (before) "Show Edited" else "Before / After")
-            }
-            Button(
-                onClick = {
+                IconButton(onClick = { if (historyIndex < history.lastIndex) { historyIndex++; values = history[historyIndex] } }, enabled = source != null && historyIndex < history.lastIndex) {
+                    Icon(Icons.Filled.Redo, contentDescription = "Redo", tint = if (historyIndex < history.lastIndex) White else Muted)
+                }
+                IconButton(onClick = { before = !before }, enabled = source != null) {
+                    Icon(Icons.Filled.CompareArrows, contentDescription = "Before and after", tint = if (before) Accent else White)
+                }
+                IconButton(onClick = {
                     val bmp = source
                     if (bmp != null) {
                         loading = true
@@ -363,82 +319,154 @@ private fun EditorScreen() {
                             message = if (result != null) "Export successful: Pictures/ProPhotoStudio" else "Export failed. Please try again."
                         }
                     }
-                },
-                enabled = source != null && !loading, modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(containerColor = Accent)
-            ) { Text("Export", color = Background) }
+                }, enabled = source != null && !loading) {
+                    Icon(Icons.Filled.Save, contentDescription = "Export photo", tint = Accent)
+                }
+            }
         }
-        if (message.isNotBlank()) Text(message, color = if (message.contains("failed", true) || message.contains("nahi", true)) Color(0xFFFF9999) else Muted, fontSize = 10.sp)
 
-        Column(Modifier.weight(1.15f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(top = 10.dp, bottom = 15.dp)) {
-            SectionTitle("LIGHT & COLOR")
-            SliderControl("Brightness", values.brightness, -1f..1f, source != null, { record(values.copy(brightness = it)) })
-            SliderControl("Contrast", values.contrast, 0f..2f, source != null, { record(values.copy(contrast = it)) }, 1f, true)
-            SliderControl("Saturation", values.saturation, 0f..2f, source != null, { record(values.copy(saturation = it)) }, 1f, true)
-            SliderControl("Exposure", values.exposure, -2f..2f, source != null, { record(values.copy(exposure = it)) })
-            SliderControl("Highlights", values.highlights, -1f..1f, source != null, { record(values.copy(highlights = it)) })
-            SliderControl("Shadows", values.shadows, -1f..1f, source != null, { record(values.copy(shadows = it)) })
-            SliderControl("Whites", values.whites, -1f..1f, source != null, { record(values.copy(whites = it)) })
-            SliderControl("Blacks", values.blacks, -1f..1f, source != null, { record(values.copy(blacks = it)) })
-            SliderControl("Temperature", values.temperature, -1f..1f, source != null, { record(values.copy(temperature = it)) })
-            SliderControl("Tint", values.tint, -1f..1f, source != null, { record(values.copy(tint = it)) })
-
-            Spacer(Modifier.height(12.dp)); SectionTitle("HSL COLOR MIXER")
-            SliderControl("Hue", values.hue, -1f..1f, source != null, { record(values.copy(hue = it)) })
-            SliderControl("Red channel", values.redHsl, -1f..1f, source != null, { record(values.copy(redHsl = it)) })
-            SliderControl("Green channel", values.greenHsl, -1f..1f, source != null, { record(values.copy(greenHsl = it)) })
-            SliderControl("Blue channel", values.blueHsl, -1f..1f, source != null, { record(values.copy(blueHsl = it)) })
-
-            Spacer(Modifier.height(12.dp)); SectionTitle("DETAIL")
-            SliderControl("Sharpening", values.sharpness, 0f..1f, source != null, { record(values.copy(sharpness = it)) })
-            SliderControl("Clarity", values.clarity, 0f..1f, source != null, { record(values.copy(clarity = it)) })
-
-            Spacer(Modifier.height(12.dp)); SectionTitle("MASKING - RADIAL SELECTIVE ADJUSTMENT")
-            Text("A soft circular mask brightens or darkens the centre region.", color = Muted, fontSize = 10.sp)
-            SliderControl("Mask strength", values.maskStrength, -1f..1f, source != null, { record(values.copy(maskStrength = it)) })
-            SliderControl("Mask size", values.maskSize, 0.1f..1f, source != null, { record(values.copy(maskSize = it)) }, 0.55f, true)
-
-            Spacer(Modifier.height(12.dp)); SectionTitle("EFFECTS")
-            SliderControl("Vignette", values.vignette, 0f..1f, source != null, { record(values.copy(vignette = it)) })
-            SliderControl("Film grain", values.grain, 0f..1f, source != null, { record(values.copy(grain = it)) })
-            SliderControl("Soft blur", values.blur, 0f..1f, source != null, { record(values.copy(blur = it)) })
-
-            Spacer(Modifier.height(12.dp)); SectionTitle("CROP & GEOMETRY")
-            Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                listOf("Original" to 0, "Square" to 1, "4:5" to 2, "16:9" to 3).forEach { item ->
-                    FilterChip(selected = values.crop == item.second, onClick = { if (source != null) record(values.copy(crop = item.second)) }, label = { Text(item.first, fontSize = 10.sp) }, enabled = source != null)
+        Box(Modifier.fillMaxWidth().weight(0.52f).clip(RoundedCornerShape(16.dp)).background(Color(0xFF080A0F)), contentAlignment = Alignment.Center) {
+            val shown = if (before) source else preview
+            if (shown != null) {
+                Image(
+                    bitmap = shown.asImageBitmap(),
+                    contentDescription = "Photo preview",
+                    modifier = Modifier.fillMaxSize().pointerInput(source) {
+                        detectTransformGestures { _, pan, zoomChange, _ ->
+                            zoom = (zoom * zoomChange).coerceIn(1f, 5f)
+                            if (zoom > 1f) { panX += pan.x; panY += pan.y } else { panX = 0f; panY = 0f }
+                        }
+                    }.graphicsLayer { scaleX = zoom; scaleY = zoom; translationX = panX; translationY = panY },
+                    contentScale = ContentScale.Fit
+                )
+                Text(if (before) "ORIGINAL" else "EDITED", Modifier.align(Alignment.TopStart).padding(10.dp)
+                    .clip(RoundedCornerShape(6.dp)).background(Color(0x99000000)).padding(horizontal = 8.dp, vertical = 5.dp),
+                    color = White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                Text("\${(zoom * 100).toInt()}%", Modifier.align(Alignment.BottomEnd).padding(10.dp)
+                    .clip(RoundedCornerShape(6.dp)).background(Color(0x99000000)).clickable { resetView() }
+                    .padding(horizontal = 8.dp, vertical = 5.dp), color = White, fontSize = 10.sp)
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Filled.AddPhotoAlternate, contentDescription = null, tint = Accent, modifier = Modifier.size(42.dp))
+                    Spacer(Modifier.height(8.dp))
+                    Text("Your photo preview", color = White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Choose a photo to start editing", color = Muted, fontSize = 11.sp)
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                OutlinedButton(onClick = { if (source != null) record(values.copy(rotation = (values.rotation + 270) % 360)) }, enabled = source != null, modifier = Modifier.weight(1f)) { Text("Rotate Left") }
-                OutlinedButton(onClick = { if (source != null) record(values.copy(rotation = (values.rotation + 90) % 360)) }, enabled = source != null, modifier = Modifier.weight(1f)) { Text("Rotate Right") }
-            }
+            if (loading) CircularProgressIndicator(Modifier.align(Alignment.Center), color = Accent)
+        }
 
-            Spacer(Modifier.height(12.dp)); SectionTitle("PRESETS")
-            Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                (builtInPresets + customPresets).forEach { preset ->
-                    FilterChip(
-                        selected = values == preset.values,
-                        onClick = { if (source != null) record(preset.values) },
-                        label = { Text(preset.name, fontSize = 10.sp) },
-                        enabled = source != null
-                    )
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                modifier = Modifier.weight(1f).height(42.dp), colors = ButtonDefaults.buttonColors(containerColor = Accent), shape = RoundedCornerShape(10.dp)) {
+                Text(if (source == null) "Open Photo" else "Change Photo", color = Background, fontWeight = FontWeight.Bold)
+            }
+            OutlinedButton(onClick = { if (source != null) record(EditValues()) }, enabled = source != null, modifier = Modifier.height(42.dp), shape = RoundedCornerShape(10.dp)) {
+                Text("Reset", color = White)
+            }
+        }
+
+        Row(Modifier.fillMaxWidth().height(56.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
+            categories.forEach { category ->
+                val active = selectedCategory == category
+                val symbol = when (category) {
+                    "Presets" -> Icons.Filled.AutoAwesome
+                    "Retouch" -> Icons.Filled.Face
+                    "Crop" -> Icons.Filled.Crop
+                    "Light" -> Icons.Filled.Tune
+                    "Color" -> Icons.Filled.Palette
+                    "Effects" -> Icons.Filled.BlurOn
+                    "Detail" -> Icons.Filled.Details
+                    else -> Icons.Filled.Layers
+                }
+                Column(Modifier.width(65.dp).clip(RoundedCornerShape(10.dp)).background(if (active) Panel2 else Color.Transparent)
+                    .clickable { selectedCategory = category }.padding(vertical = 5.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(symbol, contentDescription = category, tint = if (active) Accent else Muted, modifier = Modifier.size(20.dp))
+                    Text(category, color = if (active) Accent else Muted, fontSize = 9.sp)
                 }
             }
-            OutlinedButton(
-                onClick = {
-                    if (source != null) {
-                        customPresets = (customPresets + Preset("Custom ${customPresets.size + 1}", values)).takeLast(8)
-                        message = "Preset saved for this editing session."
+        }
+
+        Column(Modifier.fillMaxWidth().weight(0.48f).verticalScroll(rememberScrollState()).padding(top = 8.dp, bottom = 12.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text(selectedCategory.uppercase(), color = White, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Text(if (source == null) "SELECT A PHOTO FIRST" else "ADJUSTMENTS", color = Muted, fontSize = 9.sp)
+            }
+            Spacer(Modifier.height(8.dp))
+            when (selectedCategory) {
+                "Presets" -> {
+                    Text("BUILT-IN LOOKS", color = Muted, fontSize = 10.sp)
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        (builtInPresets + customPresets).forEach { preset ->
+                            FilterChip(selected = values == preset.values, onClick = { if (source != null) record(preset.values) },
+                                label = { Text(preset.name, fontSize = 10.sp) }, enabled = source != null)
+                        }
                     }
-                },
-                enabled = source != null, modifier = Modifier.fillMaxWidth()
-            ) { Text("Save Current Preset") }
-            Text("Note: custom presets are kept only while this editor screen remains open. Export creates a flattened JPG copy.", color = Muted, fontSize = 10.sp)
+                    OutlinedButton(onClick = {
+                        if (source != null) {
+                            customPresets = (customPresets + Preset("Custom \${customPresets.size + 1}", values)).takeLast(8)
+                            message = "Preset saved for this editing session."
+                        }
+                    }, enabled = source != null, modifier = Modifier.fillMaxWidth()) { Text("Save Current Preset") }
+                    Text("Custom presets remain available during this editor session.", color = Muted, fontSize = 10.sp)
+                }
+                "Retouch" -> Text("Basic retouch controls are planned for a later implementation. No AI retouch is simulated here.", color = Muted, fontSize = 12.sp)
+                "Crop" -> {
+                    Text("ASPECT RATIO", color = Muted, fontSize = 10.sp)
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        listOf("Original" to 0, "Square" to 1, "4:5" to 2, "16:9" to 3).forEach { item ->
+                            FilterChip(selected = values.crop == item.second, onClick = { if (source != null) record(values.copy(crop = item.second)) },
+                                label = { Text(item.first, fontSize = 10.sp) }, enabled = source != null)
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        OutlinedButton(onClick = { if (source != null) record(values.copy(rotation = (values.rotation + 270) % 360)) }, enabled = source != null, modifier = Modifier.weight(1f)) { Text("Rotate Left") }
+                        OutlinedButton(onClick = { if (source != null) record(values.copy(rotation = (values.rotation + 90) % 360)) }, enabled = source != null, modifier = Modifier.weight(1f)) { Text("Rotate Right") }
+                    }
+                }
+                "Light" -> {
+                    SliderControl("Exposure", values.exposure, -2f..2f, source != null, { record(values.copy(exposure = it)) })
+                    SliderControl("Brightness", values.brightness, -1f..1f, source != null, { record(values.copy(brightness = it)) })
+                    SliderControl("Contrast", values.contrast, 0f..2f, source != null, { record(values.copy(contrast = it)) }, 1f, true)
+                    SliderControl("Highlights", values.highlights, -1f..1f, source != null, { record(values.copy(highlights = it)) })
+                    SliderControl("Shadows", values.shadows, -1f..1f, source != null, { record(values.copy(shadows = it)) })
+                    SliderControl("Whites", values.whites, -1f..1f, source != null, { record(values.copy(whites = it)) })
+                    SliderControl("Blacks", values.blacks, -1f..1f, source != null, { record(values.copy(blacks = it)) })
+                }
+                "Color" -> {
+                    SliderControl("Temperature", values.temperature, -1f..1f, source != null, { record(values.copy(temperature = it)) })
+                    SliderControl("Tint", values.tint, -1f..1f, source != null, { record(values.copy(tint = it)) })
+                    SliderControl("Saturation", values.saturation, 0f..2f, source != null, { record(values.copy(saturation = it)) }, 1f, true)
+                    SliderControl("Hue shift", values.hue, -1f..1f, source != null, { record(values.copy(hue = it)) })
+                    Text("BASIC CHANNEL MIX", color = Muted, fontSize = 10.sp)
+                    SliderControl("Red", values.redHsl, -1f..1f, source != null, { record(values.copy(redHsl = it)) })
+                    SliderControl("Green", values.greenHsl, -1f..1f, source != null, { record(values.copy(greenHsl = it)) })
+                    SliderControl("Blue", values.blueHsl, -1f..1f, source != null, { record(values.copy(blueHsl = it)) })
+                }
+                "Effects" -> {
+                    SliderControl("Clarity", values.clarity, 0f..1f, source != null, { record(values.copy(clarity = it)) })
+                    SliderControl("Vignette", values.vignette, 0f..1f, source != null, { record(values.copy(vignette = it)) })
+                    SliderControl("Film grain", values.grain, 0f..1f, source != null, { record(values.copy(grain = it)) })
+                    SliderControl("Soft blur", values.blur, 0f..1f, source != null, { record(values.copy(blur = it)) })
+                }
+                "Detail" -> {
+                    SliderControl("Sharpening", values.sharpness, 0f..1f, source != null, { record(values.copy(sharpness = it)) })
+                    Text("Noise reduction and advanced optical corrections are not yet implemented.", color = Muted, fontSize = 11.sp)
+                }
+                "Mask" -> {
+                    Text("RADIAL SELECTIVE ADJUSTMENT", color = Muted, fontSize = 10.sp)
+                    Text("A soft circular mask brightens or darkens the centre region.", color = Muted, fontSize = 10.sp)
+                    SliderControl("Mask strength", values.maskStrength, -1f..1f, source != null, { record(values.copy(maskStrength = it)) })
+                    SliderControl("Mask size", values.maskSize, 0.1f..1f, source != null, { record(values.copy(maskSize = it)) }, 0.55f, true)
+                }
+            }
+            if (message.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Text(message, color = if (message.contains("failed", true) || message.contains("nahi", true)) Color(0xFFFF9999) else Accent, fontSize = 10.sp)
+            }
         }
     }
 }
-
 @Composable
 private fun SliderControl(
     title: String,
