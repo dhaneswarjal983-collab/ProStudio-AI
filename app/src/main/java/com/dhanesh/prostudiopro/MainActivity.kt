@@ -755,6 +755,8 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                 }
                 if (exportFormat == "JPEG") {
                     AdjustmentSlider("JPEG quality", exportQuality, 70f, 100f) { exportQuality = it }
+                } else {
+                    Text("PNG export is lossless; JPEG quality and camera-metadata options do not apply.", color = SecondaryText, fontSize = 10.sp, modifier = Modifier.padding(top = 6.dp))
                 }
                 Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf("Original", "2048 px", "1600 px", "1200 px").forEach { size ->
