@@ -113,7 +113,13 @@ private data class Adjustments(
     val gradientMaskCenterY: Float = 0f,
     val gradientMaskAngle: Float = 0f,
     val gradientMaskFeather: Float = 0.55f,
-    val gradientMaskExposure: Float = 0f
+    val gradientMaskExposure: Float = 0f,
+    val radialMaskEnabled: Boolean = false,
+    val radialMaskCenterX: Float = 0f,
+    val radialMaskCenterY: Float = 0f,
+    val radialMaskRadius: Float = 0.35f,
+    val radialMaskFeather: Float = 0.5f,
+    val radialMaskExposure: Float = 0f
 )
 
 private data class ColorMix(
@@ -810,6 +816,17 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                     AdjustmentSlider("Mask feather", values.gradientMaskFeather, 0.05f, 1f) { update(values.copy(gradientMaskFeather = it)) }
                     SmallAction("RESET GRADIENT MASK", { update(values.copy(gradientMaskEnabled = false, gradientMaskCenterX = 0f, gradientMaskCenterY = 0f, gradientMaskAngle = 0f, gradientMaskFeather = 0.55f, gradientMaskExposure = 0f)) }, Modifier.fillMaxWidth())
                 }
+                Text("RADIAL MASK", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
+                Text("Feathered circular selective exposure adjustment.", color = SecondaryText, fontSize = 11.sp)
+                SmallAction(if (values.radialMaskEnabled) "RADIAL MASK: ON" else "RADIAL MASK: OFF", { update(values.copy(radialMaskEnabled = !values.radialMaskEnabled)) }, Modifier.fillMaxWidth(), values.radialMaskEnabled)
+                if (values.radialMaskEnabled) {
+                    AdjustmentSlider("Radial exposure", values.radialMaskExposure, -2f, 2f) { update(values.copy(radialMaskExposure = it)) }
+                    AdjustmentSlider("Radial horizontal position", values.radialMaskCenterX, -0.5f, 0.5f) { update(values.copy(radialMaskCenterX = it)) }
+                    AdjustmentSlider("Radial vertical position", values.radialMaskCenterY, -0.5f, 0.5f) { update(values.copy(radialMaskCenterY = it)) }
+                    AdjustmentSlider("Radial size", values.radialMaskRadius, 0.05f, 0.75f) { update(values.copy(radialMaskRadius = it)) }
+                    AdjustmentSlider("Radial feather", values.radialMaskFeather, 0.05f, 1f) { update(values.copy(radialMaskFeather = it)) }
+                    SmallAction("RESET RADIAL MASK", { update(values.copy(radialMaskEnabled = false, radialMaskCenterX = 0f, radialMaskCenterY = 0f, radialMaskRadius = 0.35f, radialMaskFeather = 0.5f, radialMaskExposure = 0f)) }, Modifier.fillMaxWidth())
+                }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text("LIGHT", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
                     SmallAction("AUTO", { source?.let { update(autoAdjust(it, values)) } })
@@ -1446,7 +1463,16 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
                 val edge = a.gradientMaskFeather.coerceIn(0.05f, 1f) * 0.5f
                 ((0.5f - projection) / edge + 0.5f).coerceIn(0f, 1f).let { it * it * (3f - 2f * it) }
             } else 0f
-            val localExposure = Math.pow(2.0, a.gradientMaskExposure.toDouble() * gradientWeight).toFloat()
+            val radialWeight = if (a.radialMaskEnabled && a.radialMaskExposure != 0f) {
+                val nx = x.toFloat() / maxOf(1, w - 1) - 0.5f - a.radialMaskCenterX
+                val ny = y.toFloat() / maxOf(1, h - 1) - 0.5f - a.radialMaskCenterY
+                val distance = kotlin.math.sqrt(nx * nx + ny * ny)
+                val radius = a.radialMaskRadius.coerceIn(0.05f, 0.75f)
+                val inner = radius * (1f - a.radialMaskFeather.coerceIn(0.05f, 1f))
+                val t = ((radius - distance) / (radius - inner).coerceAtLeast(0.001f)).coerceIn(0f, 1f)
+                t * t * (3f - 2f * t)
+            } else 0f
+            val localExposure = Math.pow(2.0, (a.gradientMaskExposure * gradientWeight + a.radialMaskExposure * radialWeight).toDouble()).toFloat()
             var r = ((p shr 16) and 255).toFloat()
             var g = ((p shr 8) and 255).toFloat()
             var b = (p and 255).toFloat()
@@ -1820,6 +1846,12 @@ private fun adjustmentsToJson(a: Adjustments): JSONObject = JSONObject().apply {
     put("gradientMaskAngle", a.gradientMaskAngle)
     put("gradientMaskFeather", a.gradientMaskFeather)
     put("gradientMaskExposure", a.gradientMaskExposure)
+    put("radialMaskEnabled", a.radialMaskEnabled)
+    put("radialMaskCenterX", a.radialMaskCenterX)
+    put("radialMaskCenterY", a.radialMaskCenterY)
+    put("radialMaskRadius", a.radialMaskRadius)
+    put("radialMaskFeather", a.radialMaskFeather)
+    put("radialMaskExposure", a.radialMaskExposure)
 }
 
 private fun jsonToAdjustments(json: JSONObject): Adjustments {
@@ -1873,7 +1905,13 @@ private fun jsonToAdjustments(json: JSONObject): Adjustments {
         gradientMaskCenterY = json.optDouble("gradientMaskCenterY", 0.0).toFloat().coerceIn(-0.5f, 0.5f),
         gradientMaskAngle = json.optDouble("gradientMaskAngle", 0.0).toFloat().coerceIn(-180f, 180f),
         gradientMaskFeather = json.optDouble("gradientMaskFeather", 0.55).toFloat().coerceIn(0.05f, 1f),
-        gradientMaskExposure = json.optDouble("gradientMaskExposure", 0.0).toFloat().coerceIn(-2f, 2f)
+        gradientMaskExposure = json.optDouble("gradientMaskExposure", 0.0).toFloat().coerceIn(-2f, 2f),
+        radialMaskEnabled = json.optBoolean("radialMaskEnabled", false),
+        radialMaskCenterX = json.optDouble("radialMaskCenterX", 0.0).toFloat().coerceIn(-0.5f, 0.5f),
+        radialMaskCenterY = json.optDouble("radialMaskCenterY", 0.0).toFloat().coerceIn(-0.5f, 0.5f),
+        radialMaskRadius = json.optDouble("radialMaskRadius", 0.35).toFloat().coerceIn(0.05f, 0.75f),
+        radialMaskFeather = json.optDouble("radialMaskFeather", 0.5).toFloat().coerceIn(0.05f, 1f),
+        radialMaskExposure = json.optDouble("radialMaskExposure", 0.0).toFloat().coerceIn(-2f, 2f)
     )
 }
 
