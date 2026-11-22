@@ -570,8 +570,9 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                     }
                 }
                 if (rendered != null && !showOriginal) {
-                    val levels = remember(rendered) { sampleChannelLevels(rendered!!) }
-                    val histogram = remember(rendered) { sampleRgbHistogram(rendered!!) }
+                    val colorAnalysis = remember(rendered) { samplePhotoColorAnalysis(rendered!!) }
+                    val levels = colorAnalysis.channelLevels
+                    val histogram = colorAnalysis.histogram
                     Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)) {
                         Text("RGB HISTOGRAM", color = Accent, fontSize = 10.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
                         Canvas(Modifier.fillMaxWidth().height(74.dp).padding(top = 7.dp, bottom = 5.dp)) {
@@ -1086,7 +1087,12 @@ private fun InfoRow(label: String, value: String) {
     HorizontalDivider(color = SurfaceRaised)
 }
 
-private fun sampleRgbHistogram(bitmap: Bitmap): Array<IntArray> {
+private data class PhotoColorAnalysis(
+    val histogram: Array<IntArray>,
+    val channelLevels: FloatArray
+)
+
+private fun samplePhotoColorAnalysis(bitmap: Bitmap): PhotoColorAnalysis {
     val sample = Bitmap.createScaledBitmap(bitmap, 128, 128, true)
     try {
         val pixels = IntArray(128 * 128)
@@ -1094,31 +1100,29 @@ private fun sampleRgbHistogram(bitmap: Bitmap): Array<IntArray> {
         val redBins = IntArray(32)
         val greenBins = IntArray(32)
         val blueBins = IntArray(32)
+        var redTotal = 0L
+        var greenTotal = 0L
+        var blueTotal = 0L
         pixels.forEach { pixel ->
-            redBins[(((pixel shr 16) and 255) * 32 / 256).coerceIn(0, 31)]++
-            greenBins[(((pixel shr 8) and 255) * 32 / 256).coerceIn(0, 31)]++
-            blueBins[((pixel and 255) * 32 / 256).coerceIn(0, 31)]++
+            val red = (pixel shr 16) and 255
+            val green = (pixel shr 8) and 255
+            val blue = pixel and 255
+            redBins[red * 32 / 256]++
+            greenBins[green * 32 / 256]++
+            blueBins[blue * 32 / 256]++
+            redTotal += red
+            greenTotal += green
+            blueTotal += blue
         }
-        return arrayOf(redBins, greenBins, blueBins)
-    } finally {
-        if (sample !== bitmap && !sample.isRecycled) sample.recycle()
-    }
-}
-
-private fun sampleLuminanceHistogram(bitmap: Bitmap): IntArray {
-    val sample = Bitmap.createScaledBitmap(bitmap, 128, 128, true)
-    try {
-        val pixels = IntArray(128 * 128)
-        sample.getPixels(pixels, 0, 128, 0, 0, 128, 128)
-        val bins = IntArray(32)
-        pixels.forEach { pixel ->
-            val r = (pixel shr 16) and 255
-            val g = (pixel shr 8) and 255
-            val b = pixel and 255
-            val luma = (0.2126f * r + 0.7152f * g + 0.0722f * b).roundToInt().coerceIn(0, 255)
-            bins[(luma * bins.size / 256).coerceIn(0, bins.lastIndex)]++
-        }
-        return bins
+        val denominator = pixels.size.toFloat() * 255f
+        return PhotoColorAnalysis(
+            histogram = arrayOf(redBins, greenBins, blueBins),
+            channelLevels = floatArrayOf(
+                redTotal / denominator,
+                greenTotal / denominator,
+                blueTotal / denominator
+            )
+        )
     } finally {
         if (sample !== bitmap && !sample.isRecycled) sample.recycle()
     }
