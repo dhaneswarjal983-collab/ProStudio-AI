@@ -1006,18 +1006,21 @@ private fun InfoRow(label: String, value: String) {
 
 private fun sampleLuminanceHistogram(bitmap: Bitmap): IntArray {
     val sample = Bitmap.createScaledBitmap(bitmap, 128, 128, true)
-    val pixels = IntArray(128 * 128)
-    sample.getPixels(pixels, 0, 128, 0, 0, 128, 128)
-    val bins = IntArray(32)
-    pixels.forEach { pixel ->
-        val r = (pixel shr 16) and 255
-        val g = (pixel shr 8) and 255
-        val b = pixel and 255
-        val luma = (0.2126f * r + 0.7152f * g + 0.0722f * b).roundToInt().coerceIn(0, 255)
-        bins[(luma * bins.size / 256).coerceIn(0, bins.lastIndex)]++
+    try {
+        val pixels = IntArray(128 * 128)
+        sample.getPixels(pixels, 0, 128, 0, 0, 128, 128)
+        val bins = IntArray(32)
+        pixels.forEach { pixel ->
+            val r = (pixel shr 16) and 255
+            val g = (pixel shr 8) and 255
+            val b = pixel and 255
+            val luma = (0.2126f * r + 0.7152f * g + 0.0722f * b).roundToInt().coerceIn(0, 255)
+            bins[(luma * bins.size / 256).coerceIn(0, bins.lastIndex)]++
+        }
+        return bins
+    } finally {
+        if (sample !== bitmap && !sample.isRecycled) sample.recycle()
     }
-    if (sample !== bitmap && sample != bitmap) sample.recycle()
-    return bins
 }
 
 private data class ClippingMarker(val x: Float, val y: Float, val highlight: Boolean)
