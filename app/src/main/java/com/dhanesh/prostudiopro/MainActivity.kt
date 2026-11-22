@@ -135,6 +135,7 @@ private fun StudioApp() {
     var selectedUri by remember { mutableStateOf<Uri?>(restoredSession?.first) }
     var selectedBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var savedCount by remember { mutableIntStateOf(0) }
+    var projectRevision by remember { mutableIntStateOf(0) }
     var pendingLook by remember { mutableStateOf(restoredSession?.second ?: Adjustments()) }
     var savedProjects by remember(context) { mutableStateOf(loadSavedProjects(context)) }
     LaunchedEffect(selectedUri) {
@@ -193,6 +194,7 @@ private fun StudioApp() {
                         source = selectedBitmap,
                         sourceUri = selectedUri,
                         initialValues = pendingLook,
+                        sessionKey = projectRevision,
                         onPick = { tab = StudioTab.LIBRARY },
                         onSaved = { savedCount++ },
                         onAdjustmentsChange = { values ->
@@ -224,8 +226,11 @@ private fun StudioApp() {
                             }
                         },
                         onOpen = { project ->
-                            selectedUri = project.uri
-                            selectedBitmap = null
+                            if (selectedUri != project.uri) {
+                                selectedUri = project.uri
+                                selectedBitmap = null
+                            }
+                            projectRevision++
                             pendingLook = project.values
                             persistEditingSession(context, project.uri, project.values)
                             tab = StudioTab.EDIT
@@ -371,12 +376,12 @@ private fun LibraryScreen(selectedUri: Uri?, onSelected: (Uri, Bitmap) -> Unit) 
 }
 
 @Composable
-private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjustments, onPick: () -> Unit, onSaved: () -> Unit, onAdjustmentsChange: (Adjustments) -> Unit, onSaveLook: (Adjustments) -> Unit) {
+private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjustments, sessionKey: Int, onPick: () -> Unit, onSaved: () -> Unit, onAdjustmentsChange: (Adjustments) -> Unit, onSaveLook: (Adjustments) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val sourceDetails = remember(sourceUri) { sourceUri?.let { queryImageSourceDetails(context, it) } }
     val exifDetails = remember(sourceUri) { sourceUri?.let { queryImageExifDetails(context, it) } ?: emptyList() }
-    var values by remember(source, initialValues) { mutableStateOf(initialValues) }
+    var values by remember(source, sessionKey) { mutableStateOf(initialValues) }
     var rendered by remember { mutableStateOf<Bitmap?>(null) }
     var busy by remember { mutableStateOf(false) }
     var showOriginal by remember { mutableStateOf(false) }
@@ -389,8 +394,8 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
     var watermarkEnabled by remember { mutableStateOf(false) }
     var watermarkText by remember { mutableStateOf("Lumen Studio") }
     var notice by remember { mutableStateOf("") }
-    var undo by remember(source, initialValues) { mutableStateOf(listOf(initialValues)) }
-    var undoIndex by remember(source, initialValues) { mutableIntStateOf(0) }
+    var undo by remember(source, sessionKey) { mutableStateOf(listOf(initialValues)) }
+    var undoIndex by remember(source, sessionKey) { mutableIntStateOf(0) }
 
     fun update(next: Adjustments) {
         undo = (undo.take(undoIndex + 1) + next).takeLast(30)
