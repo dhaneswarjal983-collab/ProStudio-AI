@@ -1450,14 +1450,23 @@ private fun decodePhotoBitmap(context: android.content.Context, uri: Uri): Bitma
         context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
 
-        val options = BitmapFactory.Options().apply {
-            inSampleSize = 2
-            while (bounds.outWidth / inSampleSize > 4096 || bounds.outHeight / inSampleSize > 4096) {
-                inSampleSize *= 2
-            }
-            inPreferredConfig = Bitmap.Config.RGB_565
+        var sampleSize = 2
+        while (bounds.outWidth / sampleSize > 4096 || bounds.outHeight / sampleSize > 4096) {
+            sampleSize *= 2
         }
-        val decoded = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+        var decoded: Bitmap? = null
+        while (decoded == null && sampleSize <= 16384) {
+            val options = BitmapFactory.Options().apply {
+                inSampleSize = sampleSize
+                inPreferredConfig = Bitmap.Config.RGB_565
+            }
+            decoded = try {
+                context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+            } catch (_: OutOfMemoryError) {
+                null
+            }
+            if (decoded == null) sampleSize *= 2
+        }
         decoded?.let { applyExifRotation(context, uri, it) }
     } catch (_: Exception) {
         null
