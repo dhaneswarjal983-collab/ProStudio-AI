@@ -723,6 +723,14 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                 }
                 AdjustmentSlider("Crop horizontal", values.cropOffsetX, -1f, 1f) { update(values.copy(cropOffsetX = it)) }
                 AdjustmentSlider("Crop vertical", values.cropOffsetY, -1f, 1f) { update(values.copy(cropOffsetY = it)) }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SmallAction("CENTER HORIZONTAL", {
+                        update(values.copy(cropOffsetX = 0f))
+                    }, Modifier.weight(1f), values.cropOffsetX == 0f)
+                    SmallAction("CENTER VERTICAL", {
+                        update(values.copy(cropOffsetY = 0f))
+                    }, Modifier.weight(1f), values.cropOffsetY == 0f)
+                }
                 SmallAction("CENTER CROP POSITION", {
                     update(values.copy(cropOffsetX = 0f, cropOffsetY = 0f))
                 }, Modifier.fillMaxWidth(), values.cropOffsetX == 0f && values.cropOffsetY == 0f)
