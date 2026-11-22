@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -436,6 +437,7 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
     }
 
     LaunchedEffect(source, values) {
+        delay(120)
         if (source == null) {
             rendered = null
             previewError = false
