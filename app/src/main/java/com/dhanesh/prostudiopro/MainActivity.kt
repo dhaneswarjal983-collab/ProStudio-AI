@@ -1548,13 +1548,14 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
         val maskH = (h * maskScale).roundToInt().coerceAtLeast(1)
         Bitmap.createBitmap(maskW, maskH, Bitmap.Config.ARGB_8888).also { mask ->
             brushMaskBitmap = mask
-            mask.eraseColor(android.graphics.Color.BLACK)
+            mask.eraseColor(android.graphics.Color.TRANSPARENT)
             val maskCanvas = AndroidCanvas(mask)
             a.brushStrokes.forEach { stroke ->
                 if (stroke.points.isNotEmpty()) {
                     val width = (stroke.size.coerceIn(0.005f, 0.14f) * minOf(maskW, maskH)).coerceAtLeast(1f)
                     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        color = if (stroke.erase) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+                        color = android.graphics.Color.WHITE
+                        if (stroke.erase) xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.DST_OUT)
                         style = if (stroke.points.size == 1) Paint.Style.FILL else Paint.Style.STROKE
                         strokeWidth = width
                         strokeCap = Paint.Cap.ROUND
