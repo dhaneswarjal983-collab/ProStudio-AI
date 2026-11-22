@@ -90,7 +90,7 @@ private fun StudioApp() {
     var tab by remember { mutableStateOf(StudioTab.HOME) }
     var selectedUri by remember { mutableStateOf<Uri?>(null) }
     var selectedBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var savedCount by remember { mutableIntStateOf(0) }
+    var savedCount by remember { mutableIntStateOf(0) }\n    var pendingLook by remember { mutableStateOf(Adjustments()) }
     MaterialTheme(colorScheme = darkColorScheme(
         background = Ink, surface = SurfaceDark, primary = Accent,
         onPrimary = Ink, onBackground = Color.White, onSurface = Color.White
@@ -264,16 +264,16 @@ private fun LibraryScreen(selectedUri: Uri?, onSelected: (Uri, Bitmap) -> Unit) 
 }
 
 @Composable
-private fun EditorScreen(source: Bitmap?, onPick: () -> Unit, onSaved: () -> Unit) {
+private fun EditorScreen(source: Bitmap?, initialValues: Adjustments, onPick: () -> Unit, onSaved: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var values by remember { mutableStateOf(Adjustments()) }
+    var values by remember(source) { mutableStateOf(initialValues) }
     var rendered by remember { mutableStateOf<Bitmap?>(null) }
     var busy by remember { mutableStateOf(false) }
     var showOriginal by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf("") }
-    var undo by remember { mutableStateOf(listOf(Adjustments())) }
-    var undoIndex by remember { mutableIntStateOf(0) }
+    var undo by remember(source) { mutableStateOf(listOf(initialValues)) }
+    var undoIndex by remember(source) { mutableIntStateOf(0) }
 
     fun update(next: Adjustments) {
         undo = (undo.take(undoIndex + 1) + next).takeLast(30)
