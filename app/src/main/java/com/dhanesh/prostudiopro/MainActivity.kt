@@ -708,6 +708,9 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                 }
                 AdjustmentSlider("Crop horizontal", values.cropOffsetX, -1f, 1f) { update(values.copy(cropOffsetX = it)) }
                 AdjustmentSlider("Crop vertical", values.cropOffsetY, -1f, 1f) { update(values.copy(cropOffsetY = it)) }
+                SmallAction("CENTER CROP POSITION", {
+                    update(values.copy(cropOffsetX = 0f, cropOffsetY = 0f))
+                }, Modifier.fillMaxWidth(), values.cropOffsetX == 0f && values.cropOffsetY == 0f)
                 AdjustmentSlider("Straighten", values.rotationFine, -45f, 45f) { update(values.copy(rotationFine = it)) }
                 Spacer(Modifier.height(14.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
