@@ -142,8 +142,7 @@ private fun StudioApp() {
         val uri = selectedUri
         if (uri != null && selectedBitmap == null) {
             val restored = withContext(Dispatchers.IO) {
-                try { context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) } }
-                catch (_: Exception) { null }
+                decodePhotoBitmap(context, uri)
             }
             if (selectedUri == uri) selectedBitmap = restored
         }
@@ -354,7 +353,7 @@ private fun LibraryScreen(selectedUri: Uri?, onSelected: (Uri, Bitmap) -> Unit) 
             error = ""
             scope.launch {
                 val bitmap = withContext(Dispatchers.IO) {
-                    context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
+                    decodePhotoBitmap(context, uri)
                 }
                 loading = false
                 if (bitmap != null) onSelected(uri, bitmap) else error = "Photo load nahi hui. Dusri image select karein."
@@ -1302,6 +1301,35 @@ private fun sampleWhiteBalance(bitmap: Bitmap, centerX: Int, centerY: Int): Pair
     val tintCorrection = (((r + b) * .5f - g) / 12f).coerceIn(-1f, 1f)
     return temperatureCorrection to tintCorrection
 }
+private fun decodePhotoBitmap(context: android.content.Context, uri: Uri): Bitmap? {
+    try {
+        return context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
+    } catch (_: OutOfMemoryError) {
+        // Retry at a reduced size only when a full-resolution decode exceeds available memory.
+    } catch (_: Exception) {
+        return null
+    }
+
+    return try {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = 2
+            while (bounds.outWidth / inSampleSize > 4096 || bounds.outHeight / inSampleSize > 4096) {
+                inSampleSize *= 2
+            }
+            inPreferredConfig = Bitmap.Config.RGB_565
+        }
+        context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+    } catch (_: Exception) {
+        null
+    } catch (_: OutOfMemoryError) {
+        null
+    }
+}
+
 private fun queryImageExifDetails(context: android.content.Context, uri: Uri): List<Pair<String, String>> {
     return try {
         val exif = context.contentResolver.openInputStream(uri)?.use { ExifInterface(it) } ?: return emptyList()
