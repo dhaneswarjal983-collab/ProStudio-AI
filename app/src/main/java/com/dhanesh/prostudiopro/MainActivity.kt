@@ -1647,6 +1647,8 @@ private fun copySafeCameraMetadata(context: android.content.Context, sourceUri: 
 }
 
 private fun savePhoto(context: android.content.Context, bitmap: Bitmap, format: String, quality: Int, sourceUri: Uri?, preserveCameraMetadata: Boolean, requestedName: String): Boolean {
+    val resolver = context.contentResolver
+    var insertedUri: Uri? = null
     return try {
         val isPng = format == "PNG"
         val extension = if (isPng) "png" else "jpg"
@@ -1661,20 +1663,32 @@ private fun savePhoto(context: android.content.Context, bitmap: Bitmap, format: 
                 put(MediaStore.Images.Media.IS_PENDING, 1)
             }
         }
-        val resolver = context.contentResolver
         val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return false
+        insertedUri = uri
         val success = resolver.openOutputStream(uri)?.use { bitmap.compress(compressFormat, quality.coerceIn(70, 100), it) } ?: false
         if (!success) {
             resolver.delete(uri, null, null)
+            insertedUri = null
             return false
         }
-        if (isPng.not() && preserveCameraMetadata && sourceUri != null) {
+        if (!isPng && preserveCameraMetadata && sourceUri != null) {
             copySafeCameraMetadata(context, sourceUri, uri)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val ready = ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }
-            resolver.update(uri, ready, null, null)
+            if (resolver.update(uri, ready, null, null) <= 0) {
+                resolver.delete(uri, null, null)
+                insertedUri = null
+                return false
+            }
         }
+        insertedUri = null
         true
-    } catch (_: Exception) { false }
+    } catch (error: OutOfMemoryError) {
+        insertedUri?.let { runCatching { resolver.delete(it, null, null) } }
+        throw error
+    } catch (_: Exception) {
+        insertedUri?.let { runCatching { resolver.delete(it, null, null) } }
+        false
+    }
 }
