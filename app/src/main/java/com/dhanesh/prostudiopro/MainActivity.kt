@@ -239,6 +239,13 @@ private fun StudioApp() {
                             val updated = savedProjects.filterNot { it.id == project.id }
                             savedProjects = updated
                             persistSavedProjects(context, updated)
+                        },
+                        onRename = { project, newName ->
+                            val updated = savedProjects.map {
+                                if (it.id == project.id) it.copy(name = newName, updatedAt = System.currentTimeMillis()) else it
+                            }
+                            savedProjects = updated
+                            persistSavedProjects(context, updated)
                         }
                     )
                     StudioTab.PRESETS -> LooksScreen(
@@ -799,6 +806,29 @@ private fun LooksScreen(customLooks: List<Look>, onApply: (Look) -> Unit, onDele
                 }
             }
         }
+        renameTarget?.let { target ->
+            AlertDialog(
+                onDismissRequest = { renameTarget = null },
+                title = { Text("Rename project") },
+                text = {
+                    OutlinedTextField(
+                        value = renameText,
+                        onValueChange = { renameText = it.take(48) },
+                        singleLine = true,
+                        label = { Text("Project name") }
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        val cleanName = renameText.trim()
+                        if (cleanName.isNotEmpty()) onRename(target, cleanName)
+                        renameTarget = null
+                    }) { Text("SAVE", color = Accent) }
+                },
+                dismissButton = { TextButton(onClick = { renameTarget = null }) { Text("CANCEL") } },
+                containerColor = SurfaceDark, titleContentColor = Color.White, textContentColor = SecondaryText
+            )
+        }
         deleteTarget?.let { target ->
             AlertDialog(
                 onDismissRequest = { deleteTarget = null },
@@ -826,9 +856,12 @@ private fun ProjectsScreen(
     hasCurrentPhoto: Boolean,
     onSaveCurrent: () -> Unit,
     onOpen: (SavedProject) -> Unit,
-    onDelete: (SavedProject) -> Unit
+    onDelete: (SavedProject) -> Unit,
+    onRename: (SavedProject, String) -> Unit
 ) {
     var deleteTarget by remember { mutableStateOf<SavedProject?>(null) }
+    var renameTarget by remember { mutableStateOf<SavedProject?>(null) }
+    var renameText by remember { mutableStateOf("") }
     Page {
         BrandHeader("YOUR PROJECTS")
         Text("Keep your edits ready to continue.", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Bold)
@@ -863,7 +896,8 @@ private fun ProjectsScreen(
                     Text(project.name, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1)
                     Text(java.text.SimpleDateFormat("dd MMM yyyy, HH:mm", java.util.Locale.getDefault()).format(java.util.Date(project.updatedAt)), color = SecondaryText, fontSize = 10.sp)
                 }
-                Text("OPEN", color = Accent, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { onOpen(project) }.padding(8.dp))
+                Text("OPEN", color = Accent, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { onOpen(project) }.padding(6.dp))
+                Text("EDIT", color = SecondaryText, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { renameText = project.name; renameTarget = project }.padding(6.dp))
                 Text("×", color = Color(0xFFFF8A80), fontSize = 20.sp, modifier = Modifier.clickable { deleteTarget = project }.padding(6.dp))
             }
         }
