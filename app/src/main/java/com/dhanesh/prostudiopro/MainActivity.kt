@@ -401,6 +401,7 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
     var showOriginal by remember { mutableStateOf(false) }
     var whiteBalancePicker by remember { mutableStateOf(false) }
     var clippingWarning by remember { mutableStateOf(false) }
+    var compositionGrid by remember { mutableStateOf(false) }
     var previewSize by remember { mutableStateOf(IntSize.Zero) }
     val exportPreferences = remember(context) {
         context.getSharedPreferences(EXPORT_SETTINGS_PREFS, android.content.Context.MODE_PRIVATE)
@@ -517,6 +518,24 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Fit
                     )
+                    if (compositionGrid && image != null) {
+                        Canvas(Modifier.fillMaxSize()) {
+                            val fit = minOf(size.width / image.width, size.height / image.height)
+                            val drawnWidth = image.width * fit
+                            val drawnHeight = image.height * fit
+                            val left = (size.width - drawnWidth) / 2f
+                            val top = (size.height - drawnHeight) / 2f
+                            val right = left + drawnWidth
+                            val bottom = top + drawnHeight
+                            val guideColor = Color.White.copy(alpha = .62f)
+                            for (division in 1..2) {
+                                val x = left + drawnWidth * division / 3f
+                                val y = top + drawnHeight * division / 3f
+                                drawLine(guideColor, Offset(x, top), Offset(x, bottom), strokeWidth = 1.dp.toPx())
+                                drawLine(guideColor, Offset(left, y), Offset(right, y), strokeWidth = 1.dp.toPx())
+                            }
+                        }
+                    }
                     if (clippingWarning && image != null) {
                         val markers = remember(image, clippingWarning) { sampleClippingMarkers(image) }
                         Canvas(Modifier.fillMaxSize()) {
@@ -619,8 +638,9 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                 ) {
                     Text("SAVE CURRENT LOOK", color = Accent, fontWeight = FontWeight.Bold)
                 }
-                Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     SmallAction(if (clippingWarning) "CLIPPING: ON" else "CLIPPING: OFF", { clippingWarning = !clippingWarning }, Modifier.weight(1f), clippingWarning)
+                    SmallAction(if (compositionGrid) "GRID: ON" else "GRID: OFF", { compositionGrid = !compositionGrid }, Modifier.weight(1f), compositionGrid)
                     SmallAction("BEFORE / AFTER", { showOriginal = !showOriginal }, Modifier.weight(1f))
                 }
                 if (clippingWarning) {
