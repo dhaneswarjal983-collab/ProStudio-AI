@@ -170,7 +170,11 @@ private fun StudioApp() {
                         initialValues = pendingLook,
                         onPick = { tab = StudioTab.LIBRARY },
                         onSaved = { savedCount++ },
-                        onSaveLook = { values ->\n                            val updated = customLooks + Look("My Look ${customLooks.size + 1}", values)\n                            customLooks = updated\n                            persistCustomLooks(context, updated)\n                        }
+                        onSaveLook = { values ->
+                            val updated = customLooks + Look("My Look ${customLooks.size + 1}", values)
+                            customLooks = updated
+                            persistCustomLooks(context, updated)
+                        }
                     )
                     StudioTab.PRESETS -> LooksScreen(
                         customLooks = customLooks,
