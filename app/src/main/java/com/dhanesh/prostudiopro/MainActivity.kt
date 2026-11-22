@@ -701,6 +701,15 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                         update(values.copy(cropRatio = it))
                     }
                 }
+                SmallAction(
+                    "SWAP CROP ORIENTATION",
+                    {
+                        val swappedRatio = (1f / values.cropRatio).coerceIn(.3f, 2.4f)
+                        update(values.copy(cropRatio = swappedRatio))
+                    },
+                    Modifier.fillMaxWidth(),
+                    values.cropRatio <= 0f
+                )
                 Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     SmallAction("RESET CROP", {
                         update(values.copy(cropRatio = 0f, cropOffsetX = 0f, cropOffsetY = 0f))
