@@ -399,6 +399,7 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
     var exportQuality by remember { mutableFloatStateOf(96f) }
     var exportSize by remember { mutableStateOf("Original") }
     var watermarkEnabled by remember { mutableStateOf(false) }
+    var preserveCameraMetadata by remember { mutableStateOf(false) }
     var watermarkText by remember { mutableStateOf("Lumen Studio") }
     var notice by remember { mutableStateOf("") }
     var undo by remember(source, sessionKey) { mutableStateOf(listOf(initialValues)) }
@@ -700,6 +701,10 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                         SmallAction(size.uppercase(), { exportSize = size }, Modifier.weight(1f), exportSize == size)
                     }
                 }
+                if (exportFormat == "JPEG") {
+                    SmallAction(if (preserveCameraMetadata) "CAMERA METADATA: ON" else "CAMERA METADATA: OFF", { preserveCameraMetadata = !preserveCameraMetadata }, Modifier.fillMaxWidth(), preserveCameraMetadata)
+                    Text("Optional camera details only. GPS and device serial data are never copied.", color = SecondaryText, fontSize = 10.sp)
+                }
                 SmallAction(if (watermarkEnabled) "WATERMARK: ON" else "WATERMARK: OFF", { watermarkEnabled = !watermarkEnabled }, Modifier.fillMaxWidth(), watermarkEnabled)
                 if (watermarkEnabled) {
                     OutlinedTextField(
@@ -730,7 +735,7 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                             }
                             val output = withContext(Dispatchers.Default) { renderPhoto(original, values, exportMaxSize) }
                             val watermarked = if (watermarkEnabled && watermarkText.isNotBlank()) withContext(Dispatchers.Default) { applyWatermark(output, watermarkText) } else output
-                            val saved = withContext(Dispatchers.IO) { savePhoto(context, watermarked, exportFormat, exportQuality.roundToInt()) }
+                            val saved = withContext(Dispatchers.IO) { savePhoto(context, watermarked, exportFormat, exportQuality.roundToInt(), sourceUri, preserveCameraMetadata) }
                             busy = false
                             notice = if (saved) "Photo exported to Pictures/Lumen Studio." else "Export failed. Please try again."
                             if (saved) onSaved()
@@ -1454,7 +1459,35 @@ private fun loadCustomLooks(context: android.content.Context): List<Look> {
     }
 }
 
-private fun savePhoto(context: android.content.Context, bitmap: Bitmap, format: String, quality: Int): Boolean {
+private fun copySafeCameraMetadata(context: android.content.Context, sourceUri: Uri, destinationUri: Uri) {
+    try {
+        val sourceExif = context.contentResolver.openInputStream(sourceUri)?.use { ExifInterface(it) } ?: return
+        val safeTags = listOf(
+            ExifInterface.TAG_DATETIME_ORIGINAL,
+            ExifInterface.TAG_MAKE,
+            ExifInterface.TAG_MODEL,
+            ExifInterface.TAG_LENS_MODEL,
+            ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY,
+            ExifInterface.TAG_EXPOSURE_TIME,
+            ExifInterface.TAG_F_NUMBER,
+            ExifInterface.TAG_FOCAL_LENGTH,
+            ExifInterface.TAG_WHITE_BALANCE,
+            ExifInterface.TAG_FLASH
+        )
+        val descriptor = context.contentResolver.openFileDescriptor(destinationUri, "rw") ?: return
+        descriptor.use {
+            val destinationExif = ExifInterface(it.fileDescriptor)
+            safeTags.forEach { tag ->
+                sourceExif.getAttribute(tag)?.takeIf(String::isNotBlank)?.let { value ->
+                    destinationExif.setAttribute(tag, value)
+                }
+            }
+            destinationExif.saveAttributes()
+        }
+    } catch (_: Exception) { }
+}
+
+private fun savePhoto(context: android.content.Context, bitmap: Bitmap, format: String, quality: Int, sourceUri: Uri?, preserveCameraMetadata: Boolean): Boolean {
     return try {
         val isPng = format == "PNG"
         val extension = if (isPng) "png" else "jpg"
@@ -1474,6 +1507,9 @@ private fun savePhoto(context: android.content.Context, bitmap: Bitmap, format: 
         if (!success) {
             resolver.delete(uri, null, null)
             return false
+        }
+        if (isPng.not() && preserveCameraMetadata && sourceUri != null) {
+            copySafeCameraMetadata(context, sourceUri, uri)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val ready = ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }
