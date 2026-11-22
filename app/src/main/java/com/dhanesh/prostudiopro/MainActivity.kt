@@ -652,9 +652,9 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                 Spacer(Modifier.height(14.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text("LIGHT", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
-                SmallAction("RESET LIGHT", { update(values.copy(exposure = 0f, contrast = 1f, highlights = 0f, shadows = 0f, whites = 0f, blacks = 0f)) }, Modifier.fillMaxWidth())
                     SmallAction("AUTO", { source?.let { update(autoAdjust(it, values)) } })
                 }
+                SmallAction("RESET LIGHT", { update(values.copy(exposure = 0f, contrast = 1f, highlights = 0f, shadows = 0f, whites = 0f, blacks = 0f)) }, Modifier.fillMaxWidth())
                 AdjustmentSlider("Exposure", values.exposure, -1f, 1f) { update(values.copy(exposure = it)) }
                 AdjustmentSlider("Contrast", values.contrast, .5f, 1.8f, resetValue = 1f) { update(values.copy(contrast = it)) }
                 AdjustmentSlider("Highlights", values.highlights, -1f, 1f) { update(values.copy(highlights = it)) }
