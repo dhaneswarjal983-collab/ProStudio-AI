@@ -389,6 +389,12 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
     val exifDetails = remember(sourceUri) { sourceUri?.let { queryImageExifDetails(context, it) } ?: emptyList() }
     var values by remember(source, sessionKey) { mutableStateOf(initialValues) }
     var rendered by remember { mutableStateOf<Bitmap?>(null) }
+    DisposableEffect(rendered, source) {
+        val previewBitmap = rendered
+        onDispose {
+            previewBitmap?.takeIf { it !== source && !it.isRecycled }?.recycle()
+        }
+    }
     var busy by remember { mutableStateOf(false) }
     var previewError by remember { mutableStateOf(false) }
     var showOriginal by remember { mutableStateOf(false) }
@@ -439,6 +445,9 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
             previewError = false
             try {
                 rendered = withContext(Dispatchers.Default) { renderPhoto(source, values, 1500) }
+            } catch (_: OutOfMemoryError) {
+                rendered = null
+                previewError = true
             } catch (_: Exception) {
                 rendered = null
                 previewError = true
