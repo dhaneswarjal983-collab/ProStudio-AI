@@ -1655,7 +1655,12 @@ private fun savePhoto(context: android.content.Context, bitmap: Bitmap, format: 
         val mimeType = if (isPng) "image/png" else "image/jpeg"
         val compressFormat = if (isPng) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG
         val values = ContentValues().apply {
-            val safeName = requestedName.trim().ifBlank { "Lumen_${System.currentTimeMillis()}" }.take(40)
+            val cleanedName = requestedName.trim()
+                .replace(Regex("[^\\p{L}\\p{N} _-]"), "_")
+                .replace(Regex("\\s+"), "_")
+                .trim('_', '-', ' ')
+                .take(40)
+            val safeName = cleanedName.ifBlank { "Lumen_${System.currentTimeMillis()}" }
             put(MediaStore.Images.Media.DISPLAY_NAME, "$safeName.$extension")
             put(MediaStore.Images.Media.MIME_TYPE, mimeType)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
