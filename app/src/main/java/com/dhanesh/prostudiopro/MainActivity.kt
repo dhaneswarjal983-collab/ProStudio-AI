@@ -875,7 +875,16 @@ private fun AdjustmentSlider(label: String, value: Float, min: Float, max: Float
     Column(Modifier.padding(top = 10.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(label, color = Color.White, fontSize = 13.sp)
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {\n                Text(String.format("%.2f", value), color = SecondaryText, fontSize = 11.sp)\n                Text(\n                    "RESET",\n                    color = Accent,\n                    fontSize = 9.sp,\n                    fontWeight = FontWeight.Bold,\n                    modifier = Modifier.clickable { onChange(resetValue.coerceIn(min, max)) }\n                )\n            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(String.format("%.2f", value), color = SecondaryText, fontSize = 11.sp)
+                Text(
+                    "RESET",
+                    color = Accent,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clickable { onChange(resetValue.coerceIn(min, max)) }
+                )
+            }
         }
         Slider(
             value = value.coerceIn(min, max),
