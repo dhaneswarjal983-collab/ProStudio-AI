@@ -329,6 +329,7 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
     var busy by remember { mutableStateOf(false) }
     var showOriginal by remember { mutableStateOf(false) }
     var whiteBalancePicker by remember { mutableStateOf(false) }
+    var clippingWarning by remember { mutableStateOf(false) }
     var previewSize by remember { mutableStateOf(IntSize.Zero) }
     var exportFormat by remember { mutableStateOf("JPEG") }
     var exportQuality by remember { mutableFloatStateOf(96f) }
@@ -408,6 +409,24 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Fit
                     )
+                    if (clippingWarning && image != null) {
+                        val markers = remember(image, clippingWarning) { sampleClippingMarkers(image) }
+                        Canvas(Modifier.fillMaxSize()) {
+                            val fit = minOf(size.width / image.width, size.height / image.height)
+                            val drawnWidth = image.width * fit
+                            val drawnHeight = image.height * fit
+                            val left = (size.width - drawnWidth) / 2f
+                            val top = (size.height - drawnHeight) / 2f
+                            val radius = (size.minDimension * .006f).coerceIn(2.5f, 5f)
+                            markers.forEach { marker ->
+                                drawCircle(
+                                    color = if (marker.highlight) Color(0xFFFF5364).copy(alpha = .82f) else Color(0xFF55B9FF).copy(alpha = .82f),
+                                    radius = radius,
+                                    center = Offset(left + marker.x * drawnWidth, top + marker.y * drawnHeight)
+                                )
+                            }
+                        }
+                    }
                     if (whiteBalancePicker) {
                         Text("TAP A NEUTRAL OR WHITE AREA", color = Ink, fontSize = 10.sp, fontWeight = FontWeight.Bold,
                             modifier = Modifier.align(Alignment.BottomCenter).padding(10.dp).clip(RoundedCornerShape(9.dp)).background(Accent).padding(horizontal = 12.dp, vertical = 8.dp))
@@ -474,8 +493,17 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                 ) {
                     Text("SAVE CURRENT LOOK", color = Accent, fontWeight = FontWeight.Bold)
                 }
-                Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SmallAction(if (clippingWarning) "CLIPPING: ON" else "CLIPPING: OFF", { clippingWarning = !clippingWarning }, Modifier.weight(1f), clippingWarning)
                     SmallAction("BEFORE / AFTER", { showOriginal = !showOriginal }, Modifier.weight(1f))
+                }
+                if (clippingWarning) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("● Highlights", color = Color(0xFFFF5364), fontSize = 10.sp)
+                        Text("● Shadows", color = Color(0xFF55B9FF), fontSize = 10.sp)
+                    }
+                }
+                Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     SmallAction("UNDO", { if (undoIndex > 0) { undoIndex--; values = undo[undoIndex] } }, Modifier.weight(1f), undoIndex == 0)
                     SmallAction("REDO", { if (undoIndex < undo.lastIndex) { undoIndex++; values = undo[undoIndex] } }, Modifier.weight(1f), undoIndex >= undo.lastIndex)
                     SmallAction("RESET", { update(Adjustments()) }, Modifier.weight(1f))
@@ -762,6 +790,37 @@ private fun sampleLuminanceHistogram(bitmap: Bitmap): IntArray {
     return bins
 }
 
+private data class ClippingMarker(val x: Float, val y: Float, val highlight: Boolean)
+
+private fun sampleClippingMarkers(bitmap: Bitmap): List<ClippingMarker> {
+    val maxSide = 240
+    val scale = minOf(1f, maxSide.toFloat() / maxOf(bitmap.width, bitmap.height))
+    val sample = if (scale < 1f) Bitmap.createScaledBitmap(bitmap,
+        (bitmap.width * scale).roundToInt().coerceAtLeast(1),
+        (bitmap.height * scale).roundToInt().coerceAtLeast(1), true) else bitmap
+    val markers = ArrayList<ClippingMarker>()
+    val step = maxOf(1, maxOf(sample.width, sample.height) / 90)
+    val row = IntArray(sample.width)
+    for (y in 0 until sample.height step step) {
+        sample.getPixels(row, 0, sample.width, 0, y, sample.width, 1)
+        for (x in 0 until sample.width step step) {
+            val pixel = row[x]
+            val red = (pixel shr 16) and 255
+            val green = (pixel shr 8) and 255
+            val blue = pixel and 255
+            val luminance = (red * 0.2126f + green * 0.7152f + blue * 0.0722f)
+            if (luminance >= 250f || luminance <= 5f) {
+                markers.add(ClippingMarker(
+                    x = x.toFloat() / sample.width.coerceAtLeast(1),
+                    y = y.toFloat() / sample.height.coerceAtLeast(1),
+                    highlight = luminance >= 250f
+                ))
+            }
+        }
+    }
+    if (sample !== bitmap) sample.recycle()
+    return markers
+}
 private fun sampleChannelLevels(bitmap: Bitmap): FloatArray {
     val sample = Bitmap.createScaledBitmap(bitmap, 32, 32, true)
     val pixels = IntArray(32 * 32)
