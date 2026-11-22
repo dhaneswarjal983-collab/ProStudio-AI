@@ -91,6 +91,8 @@ private data class Adjustments(
     val flipHorizontal: Boolean = false,
     val flipVertical: Boolean = false,
     val cropRatio: Float = 0f,
+    val cropOffsetX: Float = 0f,
+    val cropOffsetY: Float = 0f,
     val colorMixer: List<ColorMix> = List(8) { ColorMix() }
 )
 
@@ -381,6 +383,8 @@ private fun EditorScreen(source: Bitmap?, initialValues: Adjustments, onPick: ()
                         SmallAction(label, { update(values.copy(cropRatio = ratio)) }, Modifier.weight(1f), values.cropRatio == ratio)
                     }
                 }
+                AdjustmentSlider("Crop horizontal", values.cropOffsetX, -1f, 1f) { update(values.copy(cropOffsetX = it)) }
+                AdjustmentSlider("Crop vertical", values.cropOffsetY, -1f, 1f) { update(values.copy(cropOffsetY = it)) }
                 AdjustmentSlider("Straighten", values.rotationFine, -45f, 45f) { update(values.copy(rotationFine = it)) }
                 Spacer(Modifier.height(14.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -626,10 +630,14 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
         val currentRatio = input.width.toFloat() / input.height.toFloat()
         if (currentRatio > a.cropRatio) {
             val cropW = (input.height * a.cropRatio).roundToInt().coerceIn(1, input.width)
-            Bitmap.createBitmap(input, (input.width - cropW) / 2, 0, cropW, input.height)
+            val maxLeft = input.width - cropW
+            val left = ((maxLeft / 2f) + a.cropOffsetX * maxLeft / 2f).roundToInt().coerceIn(0, maxLeft)
+            Bitmap.createBitmap(input, left, 0, cropW, input.height)
         } else {
             val cropH = (input.width / a.cropRatio).roundToInt().coerceIn(1, input.height)
-            Bitmap.createBitmap(input, 0, (input.height - cropH) / 2, input.width, cropH)
+            val maxTop = input.height - cropH
+            val top = ((maxTop / 2f) + a.cropOffsetY * maxTop / 2f).roundToInt().coerceIn(0, maxTop)
+            Bitmap.createBitmap(input, 0, top, input.width, cropH)
         }
     } else input
     val w = cropped.width
