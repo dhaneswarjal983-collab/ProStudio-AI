@@ -178,7 +178,12 @@ private fun StudioApp() {
                     )
                     StudioTab.PRESETS -> LooksScreen(
                         customLooks = customLooks,
-                        onApply = { look -> pendingLook = look.values; tab = if (selectedBitmap != null) StudioTab.EDIT else StudioTab.LIBRARY }
+                        onApply = { look -> pendingLook = look.values; tab = if (selectedBitmap != null) StudioTab.EDIT else StudioTab.LIBRARY },
+                        onDelete = { look ->
+                            val updated = customLooks.filterNot { it === look }
+                            customLooks = updated
+                            persistCustomLooks(context, updated)
+                        }
                     )
                     StudioTab.PROFILE -> ProfileScreen(savedCount)
                 }
@@ -599,7 +604,8 @@ private fun AdjustmentSlider(label: String, value: Float, min: Float, max: Float
 }
 
 @Composable
-private fun LooksScreen(customLooks: List<Look>, onApply: (Look) -> Unit) {
+private fun LooksScreen(customLooks: List<Look>, onApply: (Look) -> Unit, onDelete: (Look) -> Unit) {
+    var deleteTarget by remember { mutableStateOf<Look?>(null) }
     Page {
         BrandHeader("CREATIVE LOOKS")
         Text("A starting point, not a limit.", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Bold)
@@ -617,10 +623,33 @@ private fun LooksScreen(customLooks: List<Look>, onApply: (Look) -> Unit) {
                 }
                 Column(Modifier.weight(1f).padding(start = 13.dp)) {
                     Text(look.name, color = Color.White, fontWeight = FontWeight.Bold)
-                    Text(if (customLooks.any { it === look }) "Saved custom look · this session" else "Original Lumen preset", color = SecondaryText, fontSize = 11.sp)
+                    Text(if (customLooks.any { it === look }) "Saved on this device" else "Original Lumen preset", color = SecondaryText, fontSize = 11.sp)
                 }
-                Text("OPEN EDITOR  ›", color = Accent, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                if (customLooks.any { it === look }) {
+                    Text("DELETE", color = Color(0xFFFF8A80), fontSize = 9.sp, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.clickable { deleteTarget = look }.padding(6.dp))
+                } else {
+                    Text("OPEN EDITOR  ›", color = Accent, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                }
             }
+        }
+        deleteTarget?.let { target ->
+            AlertDialog(
+                onDismissRequest = { deleteTarget = null },
+                title = { Text("Delete custom look?") },
+                text = { Text("This saved look will be removed from this device.") },
+                confirmButton = {
+                    TextButton(onClick = { onDelete(target); deleteTarget = null }) {
+                        Text("DELETE", color = Color(0xFFFF8A80))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { deleteTarget = null }) { Text("CANCEL") }
+                },
+                containerColor = SurfaceDark,
+                titleContentColor = Color.White,
+                textContentColor = SecondaryText
+            )
         }
     }
 }
