@@ -484,7 +484,7 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
         postRotate(a.rotation.toFloat() + a.rotationFine)
         postScale(if (a.flipHorizontal) -1f else 1f, if (a.flipVertical) -1f else 1f)
     }
-    val input = if (a.rotation % 360 != 0 || a.flipHorizontal || a.flipVertical)
+    val input = if (a.rotation % 360 != 0 || a.rotationFine != 0f || a.flipHorizontal || a.flipVertical)
         Bitmap.createBitmap(scaled, 0, 0, scaled.width, scaled.height, matrix, true) else scaled
     val w = input.width
     val h = input.height
