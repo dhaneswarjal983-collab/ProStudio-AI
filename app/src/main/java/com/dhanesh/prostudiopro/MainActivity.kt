@@ -651,6 +651,27 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                             Text("MIDTONES", color = SecondaryText, fontSize = 8.sp)
                             Text("HIGHLIGHTS", color = SecondaryText, fontSize = 8.sp)
                         }
+                        Text("LUMINANCE HISTOGRAM", color = Accent, fontSize = 10.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+                        Canvas(Modifier.fillMaxWidth().height(48.dp).padding(top = 5.dp, bottom = 3.dp)) {
+                            val bins = colorAnalysis.luminanceHistogram
+                            val maxBin = (bins.maxOrNull() ?: 0).coerceAtLeast(1).toFloat()
+                            val slot = size.width / bins.size
+                            bins.forEachIndexed { index, count ->
+                                val barHeight = count / maxBin * size.height
+                                val x = index * slot
+                                drawLine(
+                                    color = Color(0xFFD5F36A).copy(alpha = .82f),
+                                    start = Offset(x + slot * .5f, size.height),
+                                    end = Offset(x + slot * .5f, size.height - barHeight),
+                                    strokeWidth = (slot * .72f).coerceAtLeast(1f)
+                                )
+                            }
+                        }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("DARK", color = SecondaryText, fontSize = 8.sp)
+                            Text("MID", color = SecondaryText, fontSize = 8.sp)
+                            Text("BRIGHT", color = SecondaryText, fontSize = 8.sp)
+                        }
                         Row(Modifier.fillMaxWidth().padding(top = 7.dp, bottom = 3.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                             Column {
                                 Text("SHADOW CLIPPING", color = SecondaryText, fontSize = 8.sp)
@@ -1199,6 +1220,7 @@ private fun InfoRow(label: String, value: String) {
 
 private data class PhotoColorAnalysis(
     val histogram: Array<IntArray>,
+    val luminanceHistogram: IntArray,
     val channelLevels: FloatArray,
     val shadowClippingPercent: Float,
     val highlightClippingPercent: Float
@@ -1212,6 +1234,7 @@ private fun samplePhotoColorAnalysis(bitmap: Bitmap): PhotoColorAnalysis {
         val redBins = IntArray(32)
         val greenBins = IntArray(32)
         val blueBins = IntArray(32)
+        val luminanceBins = IntArray(32)
         var redTotal = 0L
         var greenTotal = 0L
         var blueTotal = 0L
@@ -1224,6 +1247,8 @@ private fun samplePhotoColorAnalysis(bitmap: Bitmap): PhotoColorAnalysis {
             redBins[red * 32 / 256]++
             greenBins[green * 32 / 256]++
             blueBins[blue * 32 / 256]++
+            val luminance = (red * 0.2126f + green * 0.7152f + blue * 0.0722f).roundToInt().coerceIn(0, 255)
+            luminanceBins[luminance * 32 / 256]++
             redTotal += red
             greenTotal += green
             blueTotal += blue
@@ -1234,6 +1259,7 @@ private fun samplePhotoColorAnalysis(bitmap: Bitmap): PhotoColorAnalysis {
         val pixelPercent = 100f / pixels.size
         return PhotoColorAnalysis(
             histogram = arrayOf(redBins, greenBins, blueBins),
+            luminanceHistogram = luminanceBins,
             channelLevels = floatArrayOf(
                 redTotal / denominator,
                 greenTotal / denominator,
