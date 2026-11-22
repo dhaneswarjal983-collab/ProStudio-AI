@@ -697,14 +697,14 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                 }
                 if (values.cropRatio > 0f) {
                     Text("CUSTOM ASPECT RATIO", color = Accent, fontSize = 10.sp, letterSpacing = 1.5.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
-                    AdjustmentSlider("Fine tune ratio", values.cropRatio, .3f, 2.4f, resetValue = 1f) {
+                    AdjustmentSlider("Fine tune ratio", values.cropRatio, .3f, 3.333f, resetValue = 1f) {
                         update(values.copy(cropRatio = it))
                     }
                 }
                 SmallAction(
                     "SWAP CROP ORIENTATION",
                     {
-                        val swappedRatio = (1f / values.cropRatio).coerceIn(.3f, 2.4f)
+                        val swappedRatio = (1f / values.cropRatio).coerceIn(.3f, 3.333f)
                         update(values.copy(cropRatio = swappedRatio))
                     },
                     Modifier.fillMaxWidth(),
