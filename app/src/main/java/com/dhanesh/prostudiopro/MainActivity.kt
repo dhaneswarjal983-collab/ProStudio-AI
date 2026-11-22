@@ -1247,13 +1247,14 @@ private fun samplePhotoColorAnalysis(bitmap: Bitmap): PhotoColorAnalysis {
             redBins[red * 32 / 256]++
             greenBins[green * 32 / 256]++
             blueBins[blue * 32 / 256]++
-            val luminance = (red * 0.2126f + green * 0.7152f + blue * 0.0722f).roundToInt().coerceIn(0, 255)
-            luminanceBins[luminance * 32 / 256]++
+            val luminanceValue = red * 0.2126f + green * 0.7152f + blue * 0.0722f
+            val luminanceBin = luminanceValue.roundToInt().coerceIn(0, 255)
+            luminanceBins[luminanceBin * 32 / 256]++
             redTotal += red
             greenTotal += green
             blueTotal += blue
-            if (red <= 5 && green <= 5 && blue <= 5) shadowClipped++
-            if (red >= 250 && green >= 250 && blue >= 250) highlightClipped++
+            if (luminanceValue <= 5f) shadowClipped++
+            if (luminanceValue >= 250f) highlightClipped++
         }
         val denominator = pixels.size.toFloat() * 255f
         val pixelPercent = 100f / pixels.size
