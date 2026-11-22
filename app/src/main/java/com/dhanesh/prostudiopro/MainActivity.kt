@@ -77,6 +77,7 @@ private data class Adjustments(
     val rotationFine: Float = 0f,
     val flipHorizontal: Boolean = false,
     val flipVertical: Boolean = false,
+    val cropRatio: Float = 0f,
     val colorMixer: List<ColorMix> = List(8) { ColorMix() }
 )
 
@@ -345,6 +346,13 @@ private fun EditorScreen(source: Bitmap?, initialValues: Adjustments, onPick: ()
                     SmallAction("FLIP H", { update(values.copy(flipHorizontal = !values.flipHorizontal)) }, Modifier.weight(1f))
                     SmallAction("FLIP V", { update(values.copy(flipVertical = !values.flipVertical)) }, Modifier.weight(1f))
                 }
+                Text("CROP & ASPECT", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                Text("Center crop presets. Original keeps the full frame.", color = SecondaryText, fontSize = 11.sp)
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    listOf("ORIGINAL" to 0f, "1:1" to 1f, "4:3" to (4f / 3f), "3:2" to 1.5f, "16:9" to (16f / 9f)).forEach { (label, ratio) ->
+                        SmallAction(label, { update(values.copy(cropRatio = ratio)) }, Modifier.weight(1f), values.cropRatio == ratio)
+                    }
+                }
                 AdjustmentSlider("Straighten", values.rotationFine, -45f, 45f) { update(values.copy(rotationFine = it)) }
                 Spacer(Modifier.height(14.dp))
                 Text("LIGHT", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
@@ -519,13 +527,23 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
     }
     val input = if (a.rotation % 360 != 0 || a.rotationFine != 0f || a.flipHorizontal || a.flipVertical)
         Bitmap.createBitmap(scaled, 0, 0, scaled.width, scaled.height, matrix, true) else scaled
-    val w = input.width
-    val h = input.height
+    val cropped = if (a.cropRatio > 0f) {
+        val currentRatio = input.width.toFloat() / input.height.toFloat()
+        if (currentRatio > a.cropRatio) {
+            val cropW = (input.height * a.cropRatio).roundToInt().coerceIn(1, input.width)
+            Bitmap.createBitmap(input, (input.width - cropW) / 2, 0, cropW, input.height)
+        } else {
+            val cropH = (input.width / a.cropRatio).roundToInt().coerceIn(1, input.height)
+            Bitmap.createBitmap(input, 0, (input.height - cropH) / 2, input.width, cropH)
+        }
+    } else input
+    val w = cropped.width
+    val h = cropped.height
     val output = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
     val row = IntArray(w)
     val exposure = Math.pow(2.0, a.exposure.toDouble()).toFloat()
     for (y in 0 until h) {
-        input.getPixels(row, 0, w, 0, y, w, 1)
+        cropped.getPixels(row, 0, w, 0, y, w, 1)
         for (x in 0 until w) {
             val p = row[x]
             var r = ((p shr 16) and 255).toFloat()
