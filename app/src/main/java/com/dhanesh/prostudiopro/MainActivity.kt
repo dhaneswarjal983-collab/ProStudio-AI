@@ -1314,9 +1314,25 @@ private fun sampleWhiteBalance(bitmap: Bitmap, centerX: Int, centerY: Int): Pair
     val tintCorrection = (((r + b) * .5f - g) / 12f).coerceIn(-1f, 1f)
     return temperatureCorrection to tintCorrection
 }
+private fun applyExifRotation(context: android.content.Context, uri: Uri, bitmap: Bitmap): Bitmap {
+    return try {
+        val rotation = context.contentResolver.openInputStream(uri)?.use { input ->
+            ExifInterface(input).rotationDegrees
+        } ?: 0
+        if (rotation == 0) return bitmap
+        val matrix = android.graphics.Matrix().apply { postRotate(rotation.toFloat()) }
+        Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true).also { oriented ->
+            if (oriented !== bitmap && !bitmap.isRecycled) bitmap.recycle()
+        }
+    } catch (_: Exception) {
+        bitmap
+    }
+}
+
 private fun decodePhotoBitmap(context: android.content.Context, uri: Uri): Bitmap? {
     try {
-        return context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
+        val decoded = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
+        return decoded?.let { applyExifRotation(context, uri, it) }
     } catch (_: OutOfMemoryError) {
         // Retry at a reduced size only when a full-resolution decode exceeds available memory.
     } catch (_: Exception) {
@@ -1335,7 +1351,8 @@ private fun decodePhotoBitmap(context: android.content.Context, uri: Uri): Bitma
             }
             inPreferredConfig = Bitmap.Config.RGB_565
         }
-        context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+        val decoded = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+        decoded?.let { applyExifRotation(context, uri, it) }
     } catch (_: Exception) {
         null
     } catch (_: OutOfMemoryError) {
