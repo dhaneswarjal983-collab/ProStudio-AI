@@ -742,6 +742,7 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                     singleLine = true,
                     label = { Text("Export file name") },
+                    supportingText = { Text("${exportFileName.length}/40 characters") },
                     colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color.White, unfocusedTextColor = Color.White,
                         focusedBorderColor = Accent, unfocusedBorderColor = SecondaryText,
@@ -776,6 +777,7 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                         singleLine = true,
                         label = { Text("Watermark text") },
                         placeholder = { Text("Lumen Studio") },
+                        supportingText = { Text("${watermarkText.length}/32 characters") },
                         colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Color.White, unfocusedTextColor = Color.White,
                             focusedBorderColor = Accent, unfocusedBorderColor = SecondaryText,
