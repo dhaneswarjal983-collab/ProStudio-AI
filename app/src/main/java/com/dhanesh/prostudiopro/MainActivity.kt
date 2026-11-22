@@ -623,7 +623,7 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                 Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     SmallAction("UNDO", { if (undoIndex > 0) { undoIndex--; values = undo[undoIndex] } }, Modifier.weight(1f), undoIndex == 0)
                     SmallAction("REDO", { if (undoIndex < undo.lastIndex) { undoIndex++; values = undo[undoIndex] } }, Modifier.weight(1f), undoIndex >= undo.lastIndex)
-                    SmallAction("RESET", { update(Adjustments()) }, Modifier.weight(1f))
+                    SmallAction("RESET", { update(Adjustments()) }, Modifier.weight(1f), values == Adjustments())
                 }
                 Text("TRANSFORM", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
                 Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
