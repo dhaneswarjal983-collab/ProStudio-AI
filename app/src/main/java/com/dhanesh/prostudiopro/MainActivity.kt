@@ -76,7 +76,14 @@ private data class Adjustments(
     val rotation: Int = 0,
     val rotationFine: Float = 0f,
     val flipHorizontal: Boolean = false,
-    val flipVertical: Boolean = false
+    val flipVertical: Boolean = false,
+    val colorMixer: List<ColorMix> = List(8) { ColorMix() }
+)
+
+private data class ColorMix(
+    val hue: Float = 0f,
+    val saturation: Float = 0f,
+    val luminance: Float = 0f
 )
 
 private data class Look(val name: String, val values: Adjustments)
@@ -354,6 +361,32 @@ private fun EditorScreen(source: Bitmap?, initialValues: Adjustments, onPick: ()
                 AdjustmentSlider("Saturation", values.saturation, 0f, 2f) { update(values.copy(saturation = it)) }
                 AdjustmentSlider("Vibrance", values.vibrance, -1f, 1f) { update(values.copy(vibrance = it)) }
                 Spacer(Modifier.height(14.dp))
+                var selectedMix by remember { mutableIntStateOf(0) }
+                val mixNames = listOf("Red", "Orange", "Yellow", "Green", "Aqua", "Blue", "Purple", "Magenta")
+                Text("COLOR MIX", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                Text("Adjust individual color ranges without changing every color in the photo.", color = SecondaryText, fontSize = 11.sp)
+                Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    mixNames.forEachIndexed { index, name ->
+                        SmallAction(name.uppercase(), { selectedMix = index }, Modifier.weight(1f))
+                    }
+                }
+                val activeMix = values.colorMixer[selectedMix]
+                AdjustmentSlider("Hue", activeMix.hue, -100f, 100f) {
+                    val updated = values.colorMixer.toMutableList()
+                    updated[selectedMix] = activeMix.copy(hue = it)
+                    update(values.copy(colorMixer = updated))
+                }
+                AdjustmentSlider("Saturation", activeMix.saturation, -100f, 100f) {
+                    val updated = values.colorMixer.toMutableList()
+                    updated[selectedMix] = activeMix.copy(saturation = it)
+                    update(values.copy(colorMixer = updated))
+                }
+                AdjustmentSlider("Luminance", activeMix.luminance, -100f, 100f) {
+                    val updated = values.colorMixer.toMutableList()
+                    updated[selectedMix] = activeMix.copy(luminance = it)
+                    update(values.copy(colorMixer = updated))
+                }
+                Spacer(Modifier.height(14.dp))
                 Text("EFFECTS", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
                 AdjustmentSlider("Clarity", values.clarity, 0f, 1f) { update(values.copy(clarity = it)) }
                 AdjustmentSlider("Dehaze", values.dehaze, 0f, 1f) { update(values.copy(dehaze = it)) }
@@ -515,6 +548,41 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
             r = average + (r - average) * saturation
             g = average + (g - average) * saturation
             b = average + (b - average) * saturation
+            val hsv = FloatArray(3)
+            android.graphics.Color.RGBToHSV(
+                r.roundToInt().coerceIn(0, 255),
+                g.roundToInt().coerceIn(0, 255),
+                b.roundToInt().coerceIn(0, 255),
+                hsv
+            )
+            if (hsv[1] > .015f) {
+                val centers = floatArrayOf(0f, 30f, 60f, 120f, 180f, 220f, 275f, 320f)
+                var hueShift = 0f
+                var satShift = 0f
+                var lumShift = 0f
+                var totalWeight = 0f
+                centers.forEachIndexed { index, center ->
+                    var distance = abs(hsv[0] - center)
+                    distance = minOf(distance, 360f - distance)
+                    val weight = (1f - distance / 42f).coerceIn(0f, 1f)
+                    if (weight > 0f) {
+                        val mix = a.colorMixer.getOrNull(index) ?: ColorMix()
+                        hueShift += mix.hue * 0.36f * weight
+                        satShift += mix.saturation * 0.01f * weight
+                        lumShift += mix.luminance * 0.0025f * weight
+                        totalWeight += weight
+                    }
+                }
+                if (totalWeight > 0f) {
+                    hsv[0] = (hsv[0] + hueShift).let { (it % 360f + 360f) % 360f }
+                    hsv[1] = (hsv[1] + satShift).coerceIn(0f, 1f)
+                    hsv[2] = (hsv[2] + lumShift).coerceIn(0f, 1f)
+                    val mixed = android.graphics.Color.HSVToColor(hsv)
+                    r = ((mixed shr 16) and 255).toFloat()
+                    g = ((mixed shr 8) and 255).toFloat()
+                    b = (mixed and 255).toFloat()
+                }
+            }
             val nx = (x.toFloat() / w - .5f) * 2f
             val ny = (y.toFloat() / h - .5f) * 2f
             val radius = kotlin.math.sqrt(nx * nx + ny * ny)
