@@ -78,6 +78,11 @@ private data class Adjustments(
     val grain: Float = 0f,
     val sharpening: Float = 0f,
     val noiseReduction: Float = 0f,
+    val shadowTintHue: Float = 220f,
+    val shadowTintAmount: Float = 0f,
+    val highlightTintHue: Float = 45f,
+    val highlightTintAmount: Float = 0f,
+    val colorGradeBalance: Float = 0f,
     val rotation: Int = 0,
     val rotationFine: Float = 0f,
     val flipHorizontal: Boolean = false,
@@ -416,6 +421,14 @@ private fun EditorScreen(source: Bitmap?, initialValues: Adjustments, onPick: ()
                 AdjustmentSlider("Sharpening", values.sharpening, 0f, 1f) { update(values.copy(sharpening = it)) }
                 AdjustmentSlider("Noise reduction", values.noiseReduction, 0f, 1f) { update(values.copy(noiseReduction = it)) }
                 Spacer(Modifier.height(14.dp))
+                Text("COLOR GRADING", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                Text("Tint shadows and highlights independently.", color = SecondaryText, fontSize = 11.sp)
+                AdjustmentSlider("Shadow hue", values.shadowTintHue, 0f, 360f) { update(values.copy(shadowTintHue = it)) }
+                AdjustmentSlider("Shadow amount", values.shadowTintAmount, 0f, 1f) { update(values.copy(shadowTintAmount = it)) }
+                AdjustmentSlider("Highlight hue", values.highlightTintHue, 0f, 360f) { update(values.copy(highlightTintHue = it)) }
+                AdjustmentSlider("Highlight amount", values.highlightTintAmount, 0f, 1f) { update(values.copy(highlightTintAmount = it)) }
+                AdjustmentSlider("Balance", values.colorGradeBalance, -1f, 1f) { update(values.copy(colorGradeBalance = it)) }
+                Spacer(Modifier.height(14.dp))
                 Text("QUICK LOOKS", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     looks.take(3).forEach { look ->
@@ -559,6 +572,14 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
     val rowAbove = IntArray(w)
     val rowBelow = IntArray(w)
     val exposure = Math.pow(2.0, a.exposure.toDouble()).toFloat()
+    val shadowTint = android.graphics.Color.HSVToColor(floatArrayOf(a.shadowTintHue, 1f, 1f))
+    val highlightTint = android.graphics.Color.HSVToColor(floatArrayOf(a.highlightTintHue, 1f, 1f))
+    val shadowTintR = ((shadowTint shr 16) and 255).toFloat()
+    val shadowTintG = ((shadowTint shr 8) and 255).toFloat()
+    val shadowTintB = (shadowTint and 255).toFloat()
+    val highlightTintR = ((highlightTint shr 16) and 255).toFloat()
+    val highlightTintG = ((highlightTint shr 8) and 255).toFloat()
+    val highlightTintB = (highlightTint and 255).toFloat()
     for (y in 0 until h) {
         cropped.getPixels(row, 0, w, 0, y, w, 1)
         cropped.getPixels(rowAbove, 0, w, 0, (y - 1).coerceAtLeast(0), w, 1)
@@ -640,6 +661,13 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
                     b = (mixed and 255).toFloat()
                 }
             }
+            val shadowGradeWeight = (1f - luma / 255f - a.colorGradeBalance * .35f).coerceIn(0f, 1f) * a.shadowTintAmount
+            val highlightGradeWeight = (luma / 255f + a.colorGradeBalance * .35f).coerceIn(0f, 1f) * a.highlightTintAmount
+            val shadowBlend = shadowGradeWeight * .22f
+            val highlightBlend = highlightGradeWeight * .22f
+            r = r * (1f - shadowBlend - highlightBlend) + shadowTintR * shadowBlend + highlightTintR * highlightBlend
+            g = g * (1f - shadowBlend - highlightBlend) + shadowTintG * shadowBlend + highlightTintG * highlightBlend
+            b = b * (1f - shadowBlend - highlightBlend) + shadowTintB * shadowBlend + highlightTintB * highlightBlend
             val nx = (x.toFloat() / w - .5f) * 2f
             val ny = (y.toFloat() / h - .5f) * 2f
             val radius = kotlin.math.sqrt(nx * nx + ny * ny)
