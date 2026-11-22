@@ -548,6 +548,15 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                                     drawLine(guideColor, Offset(left, top), Offset(right, bottom), strokeWidth = stroke)
                                     drawLine(guideColor, Offset(right, top), Offset(left, bottom), strokeWidth = stroke)
                                 }
+                                4 -> {
+                                    val golden = .382f
+                                    for (fraction in listOf(golden, 1f - golden)) {
+                                        val x = left + drawnWidth * fraction
+                                        val y = top + drawnHeight * fraction
+                                        drawLine(guideColor, Offset(x, top), Offset(x, bottom), strokeWidth = stroke)
+                                        drawLine(guideColor, Offset(left, y), Offset(right, y), strokeWidth = stroke)
+                                    }
+                                }
                             }
                         }
                     }
@@ -656,8 +665,8 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                 Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     SmallAction(if (clippingWarning) "CLIPPING: ON" else "CLIPPING: OFF", { clippingWarning = !clippingWarning }, Modifier.weight(1f), clippingWarning)
                     SmallAction(
-                        when (compositionGuide) { 1 -> "GUIDE: THIRDS"; 2 -> "GUIDE: CENTER"; 3 -> "GUIDE: DIAGONAL"; else -> "GUIDE: OFF" },
-                        { compositionGuide = (compositionGuide + 1) % 4 },
+                        when (compositionGuide) { 1 -> "GUIDE: THIRDS"; 2 -> "GUIDE: CENTER"; 3 -> "GUIDE: DIAGONAL"; 4 -> "GUIDE: GOLDEN RATIO"; else -> "GUIDE: OFF" },
+                        { compositionGuide = (compositionGuide + 1) % 5 },
                         Modifier.weight(1f),
                         compositionGuide != 0
                     )
