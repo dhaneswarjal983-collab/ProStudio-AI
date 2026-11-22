@@ -779,6 +779,8 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                         if (original != null) scope.launch {
                             busy = true
                             notice = ""
+                            var renderedOutput: Bitmap? = null
+                            var exportBitmap: Bitmap? = null
                             try {
                                 val exportMaxSize = when (exportSize) {
                                     "2048 px" -> 2048
@@ -786,18 +788,22 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                                     "1200 px" -> 1200
                                     else -> Int.MAX_VALUE
                                 }
-                                val output = withContext(Dispatchers.Default) { renderPhoto(original, values, exportMaxSize) }
-                                val watermarked = if (watermarkEnabled && watermarkText.isNotBlank()) {
-                                    withContext(Dispatchers.Default) { applyWatermark(output, watermarkText) }
-                                } else output
+                                renderedOutput = withContext(Dispatchers.Default) { renderPhoto(original, values, exportMaxSize) }
+                                exportBitmap = if (watermarkEnabled && watermarkText.isNotBlank()) {
+                                    withContext(Dispatchers.Default) { applyWatermark(renderedOutput!!, watermarkText) }
+                                } else renderedOutput
                                 val saved = withContext(Dispatchers.IO) {
-                                    savePhoto(context, watermarked, exportFormat, exportQuality.roundToInt(), sourceUri, preserveCameraMetadata, exportFileName)
+                                    savePhoto(context, exportBitmap!!, exportFormat, exportQuality.roundToInt(), sourceUri, preserveCameraMetadata, exportFileName)
                                 }
                                 notice = if (saved) "Photo exported to Pictures/Lumen Studio." else "Export failed. Check available storage and try again."
                                 if (saved) onSaved()
+                            } catch (_: OutOfMemoryError) {
+                                notice = "Not enough memory to export this photo. Try a smaller export size."
                             } catch (_: Exception) {
                                 notice = "Export could not finish. Check available storage and try again."
                             } finally {
+                                exportBitmap?.takeIf { it !== original && !it.isRecycled }?.recycle()
+                                renderedOutput?.takeIf { it !== original && it !== exportBitmap && !it.isRecycled }?.recycle()
                                 busy = false
                             }
                         }
