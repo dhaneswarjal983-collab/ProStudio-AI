@@ -1222,6 +1222,8 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
     val rowAbove = IntArray(w)
     val rowBelow = IntArray(w)
     val exposure = Math.pow(2.0, a.exposure.toDouble()).toFloat()
+    val hsv = FloatArray(3)
+    val colorMixCenters = floatArrayOf(0f, 30f, 60f, 120f, 180f, 220f, 275f, 320f)
     val shadowTint = android.graphics.Color.HSVToColor(floatArrayOf(a.shadowTintHue, 1f, 1f))
     val highlightTint = android.graphics.Color.HSVToColor(floatArrayOf(a.highlightTintHue, 1f, 1f))
     val midtoneTint = android.graphics.Color.HSVToColor(floatArrayOf(a.midtoneTintHue, 1f, 1f))
@@ -1280,7 +1282,6 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
             r = average + (r - average) * saturation
             g = average + (g - average) * saturation
             b = average + (b - average) * saturation
-            val hsv = FloatArray(3)
             android.graphics.Color.RGBToHSV(
                 r.roundToInt().coerceIn(0, 255),
                 g.roundToInt().coerceIn(0, 255),
@@ -1288,12 +1289,11 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
                 hsv
             )
             if (hsv[1] > .015f) {
-                val centers = floatArrayOf(0f, 30f, 60f, 120f, 180f, 220f, 275f, 320f)
                 var hueShift = 0f
                 var satShift = 0f
                 var lumShift = 0f
                 var totalWeight = 0f
-                centers.forEachIndexed { index, center ->
+                colorMixCenters.forEachIndexed { index, center ->
                     var distance = abs(hsv[0] - center)
                     distance = minOf(distance, 360f - distance)
                     val weight = (1f - distance / 42f).coerceIn(0f, 1f)
