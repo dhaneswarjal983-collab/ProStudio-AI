@@ -638,13 +638,16 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                         SmallAction(label, { update(values.copy(cropRatio = ratio)) }, Modifier.weight(1f), values.cropRatio == ratio)
                     }
                 }
-                Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     SmallAction("RESET CROP", {
                         update(values.copy(cropRatio = 0f, cropOffsetX = 0f, cropOffsetY = 0f))
                     }, Modifier.weight(1f), values.cropRatio == 0f && values.cropOffsetX == 0f && values.cropOffsetY == 0f)
                     SmallAction("RESET STRAIGHTEN", {
                         update(values.copy(rotationFine = 0f))
                     }, Modifier.weight(1f), values.rotationFine == 0f)
+                    SmallAction("RESET TRANSFORM", {
+                        update(values.copy(rotation = 0, rotationFine = 0f, flipHorizontal = false, flipVertical = false))
+                    }, Modifier.weight(1f), values.rotation == 0 && values.rotationFine == 0f && !values.flipHorizontal && !values.flipVertical)
                 }
                 AdjustmentSlider("Crop horizontal", values.cropOffsetX, -1f, 1f) { update(values.copy(cropOffsetX = it)) }
                 AdjustmentSlider("Crop vertical", values.cropOffsetY, -1f, 1f) { update(values.copy(cropOffsetY = it)) }
