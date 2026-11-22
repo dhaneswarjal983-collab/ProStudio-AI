@@ -354,6 +354,21 @@ private fun EditorScreen(source: Bitmap?, initialValues: Adjustments, onPick: ()
                     )
                     if (busy) CircularProgressIndicator(color = Accent, modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).size(22.dp), strokeWidth = 2.dp)
                 }
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 4.dp)
+                        .clip(RoundedCornerShape(14.dp)).background(SurfaceDark).padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("SOURCE IMAGE", color = Accent, fontSize = 9.sp, letterSpacing = 1.5.sp, fontWeight = FontWeight.Bold)
+                        Text("${source.width} × ${source.height} px", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("RESOLUTION", color = SecondaryText, fontSize = 9.sp, letterSpacing = 1.sp)
+                        Text(String.format("%.1f MP", source.width.toLong() * source.height.toLong() / 1_000_000f), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
                 if (rendered != null && !showOriginal) {
                     val levels = remember(rendered) { sampleChannelLevels(rendered!!) }
                     val histogram = remember(rendered) { sampleLuminanceHistogram(rendered!!) }
