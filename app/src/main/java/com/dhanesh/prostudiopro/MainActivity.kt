@@ -595,7 +595,7 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                     Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)) {
                         Text("RGB HISTOGRAM", color = Accent, fontSize = 10.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
                         Canvas(Modifier.fillMaxWidth().height(74.dp).padding(top = 7.dp, bottom = 5.dp)) {
-                            val maxBin = histogram.maxOfOrNull { it.maxOrNull() ?: 0 }
+                            val maxBin = (histogram.maxOfOrNull { it.maxOrNull() ?: 0 } ?: 0)
                                 .coerceAtLeast(1).toFloat()
                             val slot = size.width / histogram[0].size
                             val channelColors = listOf(
