@@ -889,6 +889,7 @@ private fun SmallAction(label: String, action: () -> Unit, modifier: Modifier = 
 
 @Composable
 private fun AdjustmentSlider(label: String, value: Float, min: Float, max: Float, resetValue: Float = 0f, onChange: (Float) -> Unit) {
+    val atDefault = value.coerceIn(min, max) == resetValue.coerceIn(min, max)
     Column(Modifier.padding(top = 10.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(label, color = Color.White, fontSize = 13.sp)
@@ -896,10 +897,10 @@ private fun AdjustmentSlider(label: String, value: Float, min: Float, max: Float
                 Text(String.format("%.2f", value), color = SecondaryText, fontSize = 11.sp)
                 Text(
                     "RESET",
-                    color = Accent,
+                    color = if (atDefault) SecondaryText else Accent,
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.clickable { onChange(resetValue.coerceIn(min, max)) }
+                    modifier = Modifier.clickable(enabled = !atDefault) { onChange(resetValue.coerceIn(min, max)) }
                 )
             }
         }
