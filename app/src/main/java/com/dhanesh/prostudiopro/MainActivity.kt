@@ -806,29 +806,6 @@ private fun LooksScreen(customLooks: List<Look>, onApply: (Look) -> Unit, onDele
                 }
             }
         }
-        renameTarget?.let { target ->
-            AlertDialog(
-                onDismissRequest = { renameTarget = null },
-                title = { Text("Rename project") },
-                text = {
-                    OutlinedTextField(
-                        value = renameText,
-                        onValueChange = { renameText = it.take(48) },
-                        singleLine = true,
-                        label = { Text("Project name") }
-                    )
-                },
-                confirmButton = {
-                    TextButton(onClick = {
-                        val cleanName = renameText.trim()
-                        if (cleanName.isNotEmpty()) onRename(target, cleanName)
-                        renameTarget = null
-                    }) { Text("SAVE", color = Accent) }
-                },
-                dismissButton = { TextButton(onClick = { renameTarget = null }) { Text("CANCEL") } },
-                containerColor = SurfaceDark, titleContentColor = Color.White, textContentColor = SecondaryText
-            )
-        }
         deleteTarget?.let { target ->
             AlertDialog(
                 onDismissRequest = { deleteTarget = null },
@@ -900,6 +877,29 @@ private fun ProjectsScreen(
                 Text("EDIT", color = SecondaryText, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { renameText = project.name; renameTarget = project }.padding(6.dp))
                 Text("×", color = Color(0xFFFF8A80), fontSize = 20.sp, modifier = Modifier.clickable { deleteTarget = project }.padding(6.dp))
             }
+        }
+        renameTarget?.let { target ->
+            AlertDialog(
+                onDismissRequest = { renameTarget = null },
+                title = { Text("Rename project") },
+                text = {
+                    OutlinedTextField(
+                        value = renameText,
+                        onValueChange = { renameText = it.take(48) },
+                        singleLine = true,
+                        label = { Text("Project name") }
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        val cleanName = renameText.trim()
+                        if (cleanName.isNotEmpty()) onRename(target, cleanName)
+                        renameTarget = null
+                    }) { Text("SAVE", color = Accent) }
+                },
+                dismissButton = { TextButton(onClick = { renameTarget = null }) { Text("CANCEL") } },
+                containerColor = SurfaceDark, titleContentColor = Color.White, textContentColor = SecondaryText
+            )
         }
         deleteTarget?.let { target ->
             AlertDialog(
