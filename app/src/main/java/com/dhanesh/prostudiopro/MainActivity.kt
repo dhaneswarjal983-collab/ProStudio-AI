@@ -2,6 +2,9 @@ package com.dhanesh.prostudiopro
 
 import android.content.ContentValues
 import android.graphics.Bitmap
+import android.graphics.Paint
+import android.graphics.Typeface
+import android.graphics.Canvas as AndroidCanvas
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -330,6 +333,8 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
     var exportFormat by remember { mutableStateOf("JPEG") }
     var exportQuality by remember { mutableFloatStateOf(96f) }
     var exportSize by remember { mutableStateOf("Original") }
+    var watermarkEnabled by remember { mutableStateOf(false) }
+    var watermarkText by remember { mutableStateOf("Lumen Studio") }
     var notice by remember { mutableStateOf("") }
     var undo by remember(source) { mutableStateOf(listOf(initialValues)) }
     var undoIndex by remember(source) { mutableIntStateOf(0) }
@@ -577,7 +582,7 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                 }
                 Spacer(Modifier.height(16.dp))
                 Text("EXPORT SETTINGS", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
-                Text("Choose an output format and JPEG quality.", color = SecondaryText, fontSize = 11.sp)
+                Text("Choose format, quality, size and optional watermark.", color = SecondaryText, fontSize = 11.sp)
                 Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     SmallAction("JPEG", { exportFormat = "JPEG" }, Modifier.weight(1f), exportFormat == "JPEG")
                     SmallAction("PNG", { exportFormat = "PNG" }, Modifier.weight(1f), exportFormat == "PNG")
@@ -589,6 +594,23 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                     listOf("Original", "2048 px", "1600 px", "1200 px").forEach { size ->
                         SmallAction(size.uppercase(), { exportSize = size }, Modifier.weight(1f), exportSize == size)
                     }
+                }
+                SmallAction(if (watermarkEnabled) "WATERMARK: ON" else "WATERMARK: OFF", { watermarkEnabled = !watermarkEnabled }, Modifier.fillMaxWidth(), watermarkEnabled)
+                if (watermarkEnabled) {
+                    OutlinedTextField(
+                        value = watermarkText,
+                        onValueChange = { watermarkText = it.take(32) },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        singleLine = true,
+                        label = { Text("Watermark text") },
+                        placeholder = { Text("Lumen Studio") },
+                        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White, unfocusedTextColor = Color.White,
+                            focusedBorderColor = Accent, unfocusedBorderColor = SecondaryText,
+                            focusedLabelColor = Accent, unfocusedLabelColor = SecondaryText,
+                            cursorColor = Accent
+                        )
+                    )
                 }
                 Button(
                     onClick = {
@@ -602,7 +624,8 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                                 else -> Int.MAX_VALUE
                             }
                             val output = withContext(Dispatchers.Default) { renderPhoto(original, values, exportMaxSize) }
-                            val saved = withContext(Dispatchers.IO) { savePhoto(context, output, exportFormat, exportQuality.roundToInt()) }
+                            val watermarked = if (watermarkEnabled && watermarkText.isNotBlank()) withContext(Dispatchers.Default) { applyWatermark(output, watermarkText) } else output
+                            val saved = withContext(Dispatchers.IO) { savePhoto(context, watermarked, exportFormat, exportQuality.roundToInt()) }
                             busy = false
                             notice = if (saved) "Photo exported to Pictures/Lumen Studio." else "Export failed. Please try again."
                             if (saved) onSaved()
@@ -946,6 +969,26 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
 }
 
 
+private fun applyWatermark(source: Bitmap, text: String): Bitmap {
+    val output = source.copy(Bitmap.Config.ARGB_8888, true)
+    val canvas = AndroidCanvas(output)
+    val label = text.trim().take(32)
+    if (label.isEmpty()) return output
+    val margin = source.width * 0.035f
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.WHITE
+        alpha = 220
+        textSize = minOf(source.width * 0.038f, source.height * 0.065f).coerceAtLeast(16f)
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        textAlign = Paint.Align.RIGHT
+        setShadowLayer(source.width * 0.008f, 0f, source.width * 0.003f, android.graphics.Color.BLACK)
+    }
+    val maxWidth = (source.width - margin * 2f).coerceAtLeast(1f)
+    val measured = paint.measureText(label)
+    if (measured > maxWidth) paint.textScaleX = maxWidth / measured
+    canvas.drawText(label, source.width - margin, source.height - margin, paint)
+    return output
+}
 private fun sampleWhiteBalance(bitmap: Bitmap, centerX: Int, centerY: Int): Pair<Float, Float> {
     val radius = 4
     var red = 0L
