@@ -688,7 +688,7 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                 Text("Adjust individual color ranges without changing every color in the photo.", color = SecondaryText, fontSize = 11.sp)
                 SmallAction("RESET ALL COLOR MIX", {
                     update(values.copy(colorMixer = List(8) { ColorMix() }))
-                }, Modifier.fillMaxWidth())
+                }, Modifier.fillMaxWidth(), values.colorMixer.all { it == ColorMix() })
                 Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     mixNames.forEachIndexed { index, name ->
                         SmallAction(name.uppercase(), { selectedMix = index }, Modifier.weight(1f))
@@ -699,7 +699,7 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                     val updated = values.colorMixer.toMutableList()
                     updated[selectedMix] = ColorMix()
                     update(values.copy(colorMixer = updated))
-                }, Modifier.fillMaxWidth())
+                }, Modifier.fillMaxWidth(), activeMix == ColorMix())
                 AdjustmentSlider("Hue", activeMix.hue, -100f, 100f) {
                     val updated = values.colorMixer.toMutableList()
                     updated[selectedMix] = activeMix.copy(hue = it)
