@@ -1028,28 +1028,31 @@ private fun sampleClippingMarkers(bitmap: Bitmap): List<ClippingMarker> {
     val sample = if (scale < 1f) Bitmap.createScaledBitmap(bitmap,
         (bitmap.width * scale).roundToInt().coerceAtLeast(1),
         (bitmap.height * scale).roundToInt().coerceAtLeast(1), true) else bitmap
-    val markers = ArrayList<ClippingMarker>()
-    val step = maxOf(1, maxOf(sample.width, sample.height) / 90)
-    val row = IntArray(sample.width)
-    for (y in 0 until sample.height step step) {
-        sample.getPixels(row, 0, sample.width, 0, y, sample.width, 1)
-        for (x in 0 until sample.width step step) {
-            val pixel = row[x]
-            val red = (pixel shr 16) and 255
-            val green = (pixel shr 8) and 255
-            val blue = pixel and 255
-            val luminance = (red * 0.2126f + green * 0.7152f + blue * 0.0722f)
-            if (luminance >= 250f || luminance <= 5f) {
-                markers.add(ClippingMarker(
-                    x = x.toFloat() / sample.width.coerceAtLeast(1),
-                    y = y.toFloat() / sample.height.coerceAtLeast(1),
-                    highlight = luminance >= 250f
-                ))
+    try {
+        val markers = ArrayList<ClippingMarker>()
+        val step = maxOf(1, maxOf(sample.width, sample.height) / 90)
+        val row = IntArray(sample.width)
+        for (y in 0 until sample.height step step) {
+            sample.getPixels(row, 0, sample.width, 0, y, sample.width, 1)
+            for (x in 0 until sample.width step step) {
+                val pixel = row[x]
+                val red = (pixel shr 16) and 255
+                val green = (pixel shr 8) and 255
+                val blue = pixel and 255
+                val luminance = (red * 0.2126f + green * 0.7152f + blue * 0.0722f)
+                if (luminance >= 250f || luminance <= 5f) {
+                    markers.add(ClippingMarker(
+                        x = x.toFloat() / sample.width.coerceAtLeast(1),
+                        y = y.toFloat() / sample.height.coerceAtLeast(1),
+                        highlight = luminance >= 250f
+                    ))
+                }
             }
         }
+        return markers
+    } finally {
+        if (sample !== bitmap && !sample.isRecycled) sample.recycle()
     }
-    if (sample !== bitmap) sample.recycle()
-    return markers
 }
 private fun sampleChannelLevels(bitmap: Bitmap): FloatArray {
     val sample = Bitmap.createScaledBitmap(bitmap, 32, 32, true)
