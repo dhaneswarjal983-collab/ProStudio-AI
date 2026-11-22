@@ -133,11 +133,12 @@ private fun StudioApp() {
                     )
                     StudioTab.EDIT -> EditorScreen(
                         source = selectedBitmap,
+                        initialValues = pendingLook,
                         onPick = { tab = StudioTab.LIBRARY },
                         onSaved = { savedCount++ }
                     )
                     StudioTab.PRESETS -> LooksScreen(
-                        onApply = { look -> if (selectedBitmap != null) tab = StudioTab.EDIT }
+                        onApply = { look -> pendingLook = look.values; tab = if (selectedBitmap != null) StudioTab.EDIT else StudioTab.LIBRARY }
                     )
                     StudioTab.PROFILE -> ProfileScreen(savedCount)
                 }
@@ -229,12 +230,12 @@ private fun LibraryScreen(selectedUri: Uri?, onSelected: (Uri, Bitmap) -> Unit) 
     val context = LocalContext.current
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
             loading = true
             error = ""
-            LaunchedEffect(uri) { }
-            kotlinx.coroutines.MainScope().launch {
+            scope.launch {
                 val bitmap = withContext(Dispatchers.IO) {
                     context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
                 }
