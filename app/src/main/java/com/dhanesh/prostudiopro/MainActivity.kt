@@ -391,6 +391,7 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
     var values by remember(source, sessionKey) { mutableStateOf(initialValues) }
     var rendered by remember { mutableStateOf<Bitmap?>(null) }
     var busy by remember { mutableStateOf(false) }
+    var previewError by remember { mutableStateOf(false) }
     var showOriginal by remember { mutableStateOf(false) }
     var whiteBalancePicker by remember { mutableStateOf(false) }
     var clippingWarning by remember { mutableStateOf(false) }
@@ -415,16 +416,30 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
     LaunchedEffect(values) { onAdjustmentsChange(values) }
 
     LaunchedEffect(source, values) {
-        if (source != null) {
-            busy = true
-            rendered = withContext(Dispatchers.Default) { renderPhoto(source, values, 1500) }
+        if (source == null) {
+            rendered = null
+            previewError = false
             busy = false
-        } else rendered = null
+        } else {
+            busy = true
+            previewError = false
+            try {
+                rendered = withContext(Dispatchers.Default) { renderPhoto(source, values, 1500) }
+            } catch (_: Exception) {
+                rendered = null
+                previewError = true
+            } finally {
+                busy = false
+            }
+        }
     }
 
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
             BrandHeader("PHOTO EDITOR")
+            if (previewError) {
+                Text("Preview could not be rendered. Try selecting the photo again.", color = Color(0xFFFF8B8B), fontSize = 12.sp, modifier = Modifier.padding(bottom = 10.dp))
+            }
             if (source == null) {
                 Column(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(SurfaceDark).padding(24.dp),
