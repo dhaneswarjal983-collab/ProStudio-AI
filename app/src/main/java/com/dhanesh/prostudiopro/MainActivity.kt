@@ -76,6 +76,8 @@ private data class Adjustments(
     val dehaze: Float = 0f,
     val vignette: Float = 0f,
     val grain: Float = 0f,
+    val sharpening: Float = 0f,
+    val noiseReduction: Float = 0f,
     val rotation: Int = 0,
     val rotationFine: Float = 0f,
     val flipHorizontal: Boolean = false,
@@ -410,6 +412,10 @@ private fun EditorScreen(source: Bitmap?, initialValues: Adjustments, onPick: ()
                 AdjustmentSlider("Vignette", values.vignette, 0f, 1f) { update(values.copy(vignette = it)) }
                 AdjustmentSlider("Grain", values.grain, 0f, 1f) { update(values.copy(grain = it)) }
                 Spacer(Modifier.height(14.dp))
+                Text("DETAIL", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                AdjustmentSlider("Sharpening", values.sharpening, 0f, 1f) { update(values.copy(sharpening = it)) }
+                AdjustmentSlider("Noise reduction", values.noiseReduction, 0f, 1f) { update(values.copy(noiseReduction = it)) }
+                Spacer(Modifier.height(14.dp))
                 Text("QUICK LOOKS", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     looks.take(3).forEach { look ->
@@ -550,14 +556,35 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
     val h = cropped.height
     val output = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
     val row = IntArray(w)
+    val rowAbove = IntArray(w)
+    val rowBelow = IntArray(w)
     val exposure = Math.pow(2.0, a.exposure.toDouble()).toFloat()
     for (y in 0 until h) {
         cropped.getPixels(row, 0, w, 0, y, w, 1)
+        cropped.getPixels(rowAbove, 0, w, 0, (y - 1).coerceAtLeast(0), w, 1)
+        cropped.getPixels(rowBelow, 0, w, 0, (y + 1).coerceAtMost(h - 1), w, 1)
         for (x in 0 until w) {
             val p = row[x]
             var r = ((p shr 16) and 255).toFloat()
             var g = ((p shr 8) and 255).toFloat()
             var b = (p and 255).toFloat()
+            if (a.sharpening > 0f || a.noiseReduction > 0f) {
+                val left = row[(x - 1).coerceAtLeast(0)]
+                val right = row[(x + 1).coerceAtMost(w - 1)]
+                val up = rowAbove[x]
+                val down = rowBelow[x]
+                val neighborR = (((left shr 16) and 255) + ((right shr 16) and 255) + ((up shr 16) and 255) + ((down shr 16) and 255)) * .25f
+                val neighborG = (((left shr 8) and 255) + ((right shr 8) and 255) + ((up shr 8) and 255) + ((down shr 8) and 255)) * .25f
+                val neighborB = ((left and 255) + (right and 255) + (up and 255) + (down and 255)) * .25f
+                val sharpen = a.sharpening * .9f
+                val denoise = a.noiseReduction * .45f
+                r += (r - neighborR) * sharpen
+                g += (g - neighborG) * sharpen
+                b += (b - neighborB) * sharpen
+                r += (neighborR - r) * denoise
+                g += (neighborG - g) * denoise
+                b += (neighborB - b) * denoise
+            }
             val luma = .2126f * r + .7152f * g + .0722f * b
             val shadowMask = 1f - (luma / 255f).coerceIn(0f, 1f)
             val highlightMask = (luma / 255f).coerceIn(0f, 1f)
