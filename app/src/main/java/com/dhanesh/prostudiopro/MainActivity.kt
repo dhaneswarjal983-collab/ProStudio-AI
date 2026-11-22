@@ -129,10 +129,21 @@ private val looks = listOf(
 private fun StudioApp() {
     val context = LocalContext.current
     var tab by remember { mutableStateOf(StudioTab.HOME) }
-    var selectedUri by remember { mutableStateOf<Uri?>(null) }
+    val restoredSession = remember(context) { loadEditingSession(context) }
+    var selectedUri by remember { mutableStateOf<Uri?>(restoredSession?.first) }
     var selectedBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var savedCount by remember { mutableIntStateOf(0) }
-    var pendingLook by remember { mutableStateOf(Adjustments()) }
+    var pendingLook by remember { mutableStateOf(restoredSession?.second ?: Adjustments()) }
+    LaunchedEffect(selectedUri) {
+        val uri = selectedUri
+        if (uri != null && selectedBitmap == null) {
+            val restored = withContext(Dispatchers.IO) {
+                try { context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) } }
+                catch (_: Exception) { null }
+            }
+            if (selectedUri == uri) selectedBitmap = restored
+        }
+    }
     var customLooks by remember(context) { mutableStateOf(loadCustomLooks(context)) }
     MaterialTheme(colorScheme = darkColorScheme(
         background = Ink, surface = SurfaceDark, primary = Accent,
@@ -168,8 +179,10 @@ private fun StudioApp() {
                     StudioTab.LIBRARY -> LibraryScreen(
                         selectedUri = selectedUri,
                         onSelected = { uri, bitmap ->
+                            try { context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) { }
                             selectedUri = uri
                             selectedBitmap = bitmap
+                            persistEditingSession(context, uri, pendingLook)
                             tab = StudioTab.EDIT
                         }
                     )
@@ -179,6 +192,10 @@ private fun StudioApp() {
                         initialValues = pendingLook,
                         onPick = { tab = StudioTab.LIBRARY },
                         onSaved = { savedCount++ },
+                        onAdjustmentsChange = { values ->
+                            pendingLook = values
+                            selectedUri?.let { persistEditingSession(context, it, values) }
+                        },
                         onSaveLook = { values ->
                             val updated = customLooks + Look("My Look ${customLooks.size + 1}", values)
                             customLooks = updated
@@ -320,7 +337,7 @@ private fun LibraryScreen(selectedUri: Uri?, onSelected: (Uri, Bitmap) -> Unit) 
 }
 
 @Composable
-private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjustments, onPick: () -> Unit, onSaved: () -> Unit, onSaveLook: (Adjustments) -> Unit) {
+private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjustments, onPick: () -> Unit, onSaved: () -> Unit, onAdjustmentsChange: (Adjustments) -> Unit, onSaveLook: (Adjustments) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val sourceDetails = remember(sourceUri) { sourceUri?.let { queryImageSourceDetails(context, it) } }
@@ -345,6 +362,8 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
         undoIndex = undo.lastIndex
         values = next
     }
+
+    LaunchedEffect(values) { onAdjustmentsChange(values) }
 
     LaunchedEffect(source, values) {
         if (source != null) {
@@ -1094,6 +1113,31 @@ private fun formatImageFileSize(bytes: Long): String {
     }
 }
 
+private const val EDITING_SESSION_PREFS = "lumen_editing_session"
+private const val EDITING_SESSION_KEY = "last_project"
+
+private fun persistEditingSession(context: android.content.Context, uri: Uri, values: Adjustments) {
+    try {
+        val session = JSONObject().apply {
+            put("uri", uri.toString())
+            put("values", adjustmentsToJson(values))
+            put("updatedAt", System.currentTimeMillis())
+        }
+        context.getSharedPreferences(EDITING_SESSION_PREFS, android.content.Context.MODE_PRIVATE)
+            .edit().putString(EDITING_SESSION_KEY, session.toString()).apply()
+    } catch (_: Exception) { }
+}
+
+private fun loadEditingSession(context: android.content.Context): Pair<Uri, Adjustments>? {
+    return try {
+        val raw = context.getSharedPreferences(EDITING_SESSION_PREFS, android.content.Context.MODE_PRIVATE)
+            .getString(EDITING_SESSION_KEY, null) ?: return null
+        val session = JSONObject(raw)
+        val uri = Uri.parse(session.optString("uri")).takeIf { it.scheme == "content" } ?: return null
+        val values = session.optJSONObject("values")?.let(::jsonToAdjustments) ?: Adjustments()
+        uri to values
+    } catch (_: Exception) { null }
+}
 private const val CUSTOM_LOOKS_PREFS = "lumen_custom_looks"
 private const val CUSTOM_LOOKS_KEY = "saved_looks"
 
