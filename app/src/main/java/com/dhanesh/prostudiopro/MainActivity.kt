@@ -27,6 +27,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
@@ -321,6 +325,8 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
     var rendered by remember { mutableStateOf<Bitmap?>(null) }
     var busy by remember { mutableStateOf(false) }
     var showOriginal by remember { mutableStateOf(false) }
+    var whiteBalancePicker by remember { mutableStateOf(false) }
+    var previewSize by remember { mutableStateOf(IntSize.Zero) }
     var exportFormat by remember { mutableStateOf("JPEG") }
     var exportQuality by remember { mutableFloatStateOf(96f) }
     var exportSize by remember { mutableStateOf("Original") }
@@ -360,7 +366,34 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                 }
             } else {
                 Box(
-                    Modifier.fillMaxWidth().height(310.dp).clip(RoundedCornerShape(20.dp)).background(SurfaceRaised),
+                    Modifier.fillMaxWidth().height(310.dp).clip(RoundedCornerShape(20.dp)).background(SurfaceRaised)
+                        .onSizeChanged { previewSize = it }
+                        .pointerInput(whiteBalancePicker, source, previewSize, values) {
+                            if (whiteBalancePicker && source != null) {
+                                detectTapGestures { tap ->
+                                    val boxW = previewSize.width.toFloat()
+                                    val boxH = previewSize.height.toFloat()
+                                    val scale = minOf(boxW / source.width, boxH / source.height)
+                                    val imageW = source.width * scale
+                                    val imageH = source.height * scale
+                                    val left = (boxW - imageW) / 2f
+                                    val top = (boxH - imageH) / 2f
+                                    val imageX = ((tap.x - left) / scale).toInt()
+                                    val imageY = ((tap.y - top) / scale).toInt()
+                                    if (imageX in 0 until source.width && imageY in 0 until source.height) {
+                                        val sampled = sampleWhiteBalance(source, imageX, imageY)
+                                        update(values.copy(
+                                            temperature = (values.temperature + sampled.first).coerceIn(-1f, 1f),
+                                            tint = (values.tint + sampled.second).coerceIn(-1f, 1f)
+                                        ))
+                                        whiteBalancePicker = false
+                                        notice = "White balance sampled from selected point."
+                                    } else {
+                                        notice = "Photo ke andar kisi neutral ya white area par tap karein."
+                                    }
+                                }
+                            }
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     val image = if (showOriginal) source else rendered
@@ -370,6 +403,10 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Fit
                     )
+                    if (whiteBalancePicker) {
+                        Text("TAP A NEUTRAL OR WHITE AREA", color = Ink, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                            modifier = Modifier.align(Alignment.BottomCenter).padding(10.dp).clip(RoundedCornerShape(9.dp)).background(Accent).padding(horizontal = 12.dp, vertical = 8.dp))
+                    }
                     if (busy) CircularProgressIndicator(color = Accent, modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).size(22.dp), strokeWidth = 2.dp)
                 }
                 Row(
@@ -473,6 +510,9 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                 AdjustmentSlider("Highlight curve", values.toneHighlights, -1f, 1f) { update(values.copy(toneHighlights = it)) }
                 Spacer(Modifier.height(14.dp))
                 Text("COLOR", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                SmallAction(if (whiteBalancePicker) "CANCEL WHITE BALANCE PICKER" else "WHITE BALANCE PICKER",
+                    { whiteBalancePicker = !whiteBalancePicker; notice = if (!whiteBalancePicker) "White balance picker cancelled." else "Preview par neutral ya white area select karein." },
+                    Modifier.fillMaxWidth(), source == null)
                 AdjustmentSlider("Temperature", values.temperature, -1f, 1f) { update(values.copy(temperature = it)) }
                 AdjustmentSlider("Tint", values.tint, -1f, 1f) { update(values.copy(tint = it)) }
                 AdjustmentSlider("Saturation", values.saturation, 0f, 2f) { update(values.copy(saturation = it)) }
@@ -906,6 +946,29 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
 }
 
 
+private fun sampleWhiteBalance(bitmap: Bitmap, centerX: Int, centerY: Int): Pair<Float, Float> {
+    val radius = 4
+    var red = 0L
+    var green = 0L
+    var blue = 0L
+    var count = 0L
+    for (y in (centerY - radius).coerceAtLeast(0)..(centerY + radius).coerceAtMost(bitmap.height - 1)) {
+        for (x in (centerX - radius).coerceAtLeast(0)..(centerX + radius).coerceAtMost(bitmap.width - 1)) {
+            val pixel = bitmap.getPixel(x, y)
+            red += (pixel shr 16) and 255
+            green += (pixel shr 8) and 255
+            blue += pixel and 255
+            count++
+        }
+    }
+    if (count == 0L) return 0f to 0f
+    val r = red.toFloat() / count
+    val g = green.toFloat() / count
+    val b = blue.toFloat() / count
+    val temperatureCorrection = ((b - r) / 56f).coerceIn(-1f, 1f)
+    val tintCorrection = (((r + b) * .5f - g) / 12f).coerceIn(-1f, 1f)
+    return temperatureCorrection to tintCorrection
+}
 private fun queryImageSourceDetails(context: android.content.Context, uri: Uri): Pair<String?, Long?> {
     return try {
         context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { cursor ->
