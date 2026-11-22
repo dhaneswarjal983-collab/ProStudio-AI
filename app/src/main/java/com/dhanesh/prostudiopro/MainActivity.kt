@@ -72,7 +72,10 @@ private data class Adjustments(
     val clarity: Float = 0f,
     val dehaze: Float = 0f,
     val vignette: Float = 0f,
-    val grain: Float = 0f
+    val grain: Float = 0f,
+    val rotation: Int = 0,
+    val flipHorizontal: Boolean = false,
+    val flipVertical: Boolean = false
 )
 
 private data class Look(val name: String, val values: Adjustments)
@@ -327,6 +330,13 @@ private fun EditorScreen(source: Bitmap?, initialValues: Adjustments, onPick: ()
                     SmallAction("UNDO", { if (undoIndex > 0) { undoIndex--; values = undo[undoIndex] } }, Modifier.weight(1f), undoIndex == 0)
                     SmallAction("RESET", { update(Adjustments()) }, Modifier.weight(1f))
                 }
+                Text("TRANSFORM", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SmallAction("ROTATE 90°", { update(values.copy(rotation = (values.rotation + 90) % 360)) }, Modifier.weight(1f))
+                    SmallAction("FLIP H", { update(values.copy(flipHorizontal = !values.flipHorizontal)) }, Modifier.weight(1f))
+                    SmallAction("FLIP V", { update(values.copy(flipVertical = !values.flipVertical)) }, Modifier.weight(1f))
+                }
+                Spacer(Modifier.height(14.dp))
                 Text("LIGHT", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
                 AdjustmentSlider("Exposure", values.exposure, -1f, 1f) { update(values.copy(exposure = it)) }
                 AdjustmentSlider("Contrast", values.contrast, .5f, 1.8f) { update(values.copy(contrast = it)) }
@@ -466,7 +476,15 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
     val scale = if (maxDimension == Int.MAX_VALUE) 1f else minOf(1f, maxDimension.toFloat() / maxOf(source.width, source.height))
     val w = (source.width * scale).roundToInt().coerceAtLeast(1)
     val h = (source.height * scale).roundToInt().coerceAtLeast(1)
-    val input = if (w != source.width || h != source.height) Bitmap.createScaledBitmap(source, w, h, true) else source
+    val scaled = if (w != source.width || h != source.height) Bitmap.createScaledBitmap(source, w, h, true) else source
+    val matrix = android.graphics.Matrix().apply {
+        postRotate(a.rotation.toFloat())
+        postScale(if (a.flipHorizontal) -1f else 1f, if (a.flipVertical) -1f else 1f)
+    }
+    val input = if (a.rotation % 360 != 0 || a.flipHorizontal || a.flipVertical)
+        Bitmap.createBitmap(scaled, 0, 0, scaled.width, scaled.height, matrix, true) else scaled
+    val w = input.width
+    val h = input.height
     val pixels = IntArray(w * h)
     input.getPixels(pixels, 0, w, 0, 0, w, h)
     val exposure = Math.pow(2.0, a.exposure.toDouble()).toFloat()
