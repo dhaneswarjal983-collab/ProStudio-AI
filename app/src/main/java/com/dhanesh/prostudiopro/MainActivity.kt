@@ -728,6 +728,10 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                 }
                 AdjustmentSlider("Crop horizontal", values.cropOffsetX, -1f, 1f) { update(values.copy(cropOffsetX = it)) }
                 AdjustmentSlider("Crop vertical", values.cropOffsetY, -1f, 1f) { update(values.copy(cropOffsetY = it)) }
+                Text(
+                    "POSITION  •  H: ${if (kotlin.math.abs(values.cropOffsetX) < .01f) "CENTER" else String.format("%.0f%% TOWARD %s", kotlin.math.abs(values.cropOffsetX) * 50f, if (values.cropOffsetX < 0f) "LEFT" else "RIGHT")}  •  V: ${if (kotlin.math.abs(values.cropOffsetY) < .01f) "CENTER" else String.format("%.0f%% TOWARD %s", kotlin.math.abs(values.cropOffsetY) * 50f, if (values.cropOffsetY < 0f) "TOP" else "BOTTOM")}",
+                    color = SecondaryText, fontSize = 10.sp, letterSpacing = .4.sp
+                )
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     SmallAction("CENTER HORIZONTAL", {
                         update(values.copy(cropOffsetX = 0f))
