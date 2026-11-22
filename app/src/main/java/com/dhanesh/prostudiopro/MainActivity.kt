@@ -1316,11 +1316,15 @@ private fun sampleWhiteBalance(bitmap: Bitmap, centerX: Int, centerY: Int): Pair
 }
 private fun applyExifRotation(context: android.content.Context, uri: Uri, bitmap: Bitmap): Bitmap {
     return try {
-        val rotation = context.contentResolver.openInputStream(uri)?.use { input ->
-            ExifInterface(input).rotationDegrees
-        } ?: 0
-        if (rotation == 0) return bitmap
-        val matrix = android.graphics.Matrix().apply { postRotate(rotation.toFloat()) }
+        val orientation = context.contentResolver.openInputStream(uri)?.use { input ->
+            ExifInterface(input).let { it.rotationDegrees to it.isFlipped }
+        } ?: (0 to false)
+        val (rotation, flipped) = orientation
+        if (rotation == 0 && !flipped) return bitmap
+        val matrix = android.graphics.Matrix().apply {
+            postRotate(rotation.toFloat())
+            if (flipped) postScale(-1f, 1f)
+        }
         Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true).also { oriented ->
             if (oriented !== bitmap && !bitmap.isRecycled) bitmap.recycle()
         }
