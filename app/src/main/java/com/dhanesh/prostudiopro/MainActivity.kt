@@ -400,6 +400,7 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
     var exportSize by remember { mutableStateOf("Original") }
     var watermarkEnabled by remember { mutableStateOf(false) }
     var preserveCameraMetadata by remember { mutableStateOf(false) }
+    var exportFileName by remember { mutableStateOf("Lumen_Edit") }
     var watermarkText by remember { mutableStateOf("Lumen Studio") }
     var notice by remember { mutableStateOf("") }
     var undo by remember(source, sessionKey) { mutableStateOf(listOf(initialValues)) }
@@ -689,6 +690,19 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                 Spacer(Modifier.height(16.dp))
                 Text("EXPORT SETTINGS", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
                 Text("Choose format, quality, size and optional watermark.", color = SecondaryText, fontSize = 11.sp)
+                OutlinedTextField(
+                    value = exportFileName,
+                    onValueChange = { exportFileName = it.filter { ch -> ch.isLetterOrDigit() || ch == '_' || ch == '-' || ch == ' ' }.take(40) },
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    singleLine = true,
+                    label = { Text("Export file name") },
+                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White, unfocusedTextColor = Color.White,
+                        focusedBorderColor = Accent, unfocusedBorderColor = SecondaryText,
+                        focusedLabelColor = Accent, unfocusedLabelColor = SecondaryText,
+                        cursorColor = Accent
+                    )
+                )
                 Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     SmallAction("JPEG", { exportFormat = "JPEG" }, Modifier.weight(1f), exportFormat == "JPEG")
                     SmallAction("PNG", { exportFormat = "PNG" }, Modifier.weight(1f), exportFormat == "PNG")
@@ -735,7 +749,7 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                             }
                             val output = withContext(Dispatchers.Default) { renderPhoto(original, values, exportMaxSize) }
                             val watermarked = if (watermarkEnabled && watermarkText.isNotBlank()) withContext(Dispatchers.Default) { applyWatermark(output, watermarkText) } else output
-                            val saved = withContext(Dispatchers.IO) { savePhoto(context, watermarked, exportFormat, exportQuality.roundToInt(), sourceUri, preserveCameraMetadata) }
+                            val saved = withContext(Dispatchers.IO) { savePhoto(context, watermarked, exportFormat, exportQuality.roundToInt(), sourceUri, preserveCameraMetadata, exportFileName) }
                             busy = false
                             notice = if (saved) "Photo exported to Pictures/Lumen Studio." else "Export failed. Please try again."
                             if (saved) onSaved()
@@ -1487,14 +1501,15 @@ private fun copySafeCameraMetadata(context: android.content.Context, sourceUri: 
     } catch (_: Exception) { }
 }
 
-private fun savePhoto(context: android.content.Context, bitmap: Bitmap, format: String, quality: Int, sourceUri: Uri?, preserveCameraMetadata: Boolean): Boolean {
+private fun savePhoto(context: android.content.Context, bitmap: Bitmap, format: String, quality: Int, sourceUri: Uri?, preserveCameraMetadata: Boolean, requestedName: String): Boolean {
     return try {
         val isPng = format == "PNG"
         val extension = if (isPng) "png" else "jpg"
         val mimeType = if (isPng) "image/png" else "image/jpeg"
         val compressFormat = if (isPng) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG
         val values = ContentValues().apply {
-            put(MediaStore.Images.Media.DISPLAY_NAME, "Lumen_${System.currentTimeMillis()}.$extension")
+            val safeName = requestedName.trim().ifBlank { "Lumen_${System.currentTimeMillis()}" }.take(40)
+            put(MediaStore.Images.Media.DISPLAY_NAME, "$safeName.$extension")
             put(MediaStore.Images.Media.MIME_TYPE, mimeType)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Lumen Studio")
