@@ -656,7 +656,10 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                 }
                 Text("TRANSFORM", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
                 Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SmallAction("ROTATE 90°", { update(values.copy(rotation = (values.rotation + 90) % 360)) }, Modifier.weight(1f))
+                    SmallAction("ROTATE LEFT", { update(values.copy(rotation = (values.rotation + 270) % 360)) }, Modifier.weight(1f))
+                    SmallAction("ROTATE RIGHT", { update(values.copy(rotation = (values.rotation + 90) % 360)) }, Modifier.weight(1f))
+                }
+                Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     SmallAction("FLIP H", { update(values.copy(flipHorizontal = !values.flipHorizontal)) }, Modifier.weight(1f))
                     SmallAction("FLIP V", { update(values.copy(flipVertical = !values.flipVertical)) }, Modifier.weight(1f))
                 }
