@@ -1128,12 +1128,18 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
     val scaledW = (source.width * scale).roundToInt().coerceAtLeast(1)
     val scaledH = (source.height * scale).roundToInt().coerceAtLeast(1)
     val scaled = if (scaledW != source.width || scaledH != source.height) Bitmap.createScaledBitmap(source, scaledW, scaledH, true) else source
+    var inputBitmap: Bitmap? = null
+    var croppedBitmap: Bitmap? = null
+    var outputBitmap: Bitmap? = null
+    var completed = false
+    try {
     val matrix = android.graphics.Matrix().apply {
         postRotate(a.rotation.toFloat() + a.rotationFine)
         postScale(if (a.flipHorizontal) -1f else 1f, if (a.flipVertical) -1f else 1f)
     }
     val input = if (a.rotation % 360 != 0 || a.rotationFine != 0f || a.flipHorizontal || a.flipVertical)
         Bitmap.createBitmap(scaled, 0, 0, scaled.width, scaled.height, matrix, true) else scaled
+    inputBitmap = input
     val cropped = if (a.cropRatio > 0f) {
         val currentRatio = input.width.toFloat() / input.height.toFloat()
         if (currentRatio > a.cropRatio) {
@@ -1148,9 +1154,11 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
             Bitmap.createBitmap(input, 0, top, input.width, cropH)
         }
     } else input
+    croppedBitmap = cropped
     val w = cropped.width
     val h = cropped.height
     val output = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    outputBitmap = output
     val row = IntArray(w)
     val rowAbove = IntArray(w)
     val rowBelow = IntArray(w)
@@ -1282,7 +1290,14 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
         }
         output.setPixels(row, 0, w, 0, y, w, 1)
     }
+    completed = true
     return output
+    } finally {
+        if (outputBitmap != null && !completed && outputBitmap !== source && !outputBitmap.isRecycled) outputBitmap.recycle()
+        if (croppedBitmap != null && croppedBitmap !== inputBitmap && croppedBitmap !== source && !croppedBitmap.isRecycled) croppedBitmap.recycle()
+        if (inputBitmap != null && inputBitmap !== scaled && inputBitmap !== source && !inputBitmap.isRecycled) inputBitmap.recycle()
+        if (scaled !== source && !scaled.isRecycled) scaled.recycle()
+    }
 }
 
 
