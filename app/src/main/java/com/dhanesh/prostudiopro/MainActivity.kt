@@ -1328,6 +1328,10 @@ private fun applyExifRotation(context: android.content.Context, uri: Uri, bitmap
         Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true).also { oriented ->
             if (oriented !== bitmap && !bitmap.isRecycled) bitmap.recycle()
         }
+    } catch (error: OutOfMemoryError) {
+        // Release the decoded source before the caller retries with a smaller sample.
+        if (!bitmap.isRecycled) bitmap.recycle()
+        throw error
     } catch (_: Exception) {
         bitmap
     }
