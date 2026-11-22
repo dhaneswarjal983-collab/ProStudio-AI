@@ -8,6 +8,7 @@ import android.graphics.Canvas as AndroidCanvas
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
+import androidx.exifinterface.media.ExifInterface
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
@@ -341,6 +342,7 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val sourceDetails = remember(sourceUri) { sourceUri?.let { queryImageSourceDetails(context, it) } }
+    val exifDetails = remember(sourceUri) { sourceUri?.let { queryImageExifDetails(context, it) } ?: emptyList() }
     var values by remember(source) { mutableStateOf(initialValues) }
     var rendered by remember { mutableStateOf<Bitmap?>(null) }
     var busy by remember { mutableStateOf(false) }
@@ -467,6 +469,17 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                         Text("RESOLUTION", color = SecondaryText, fontSize = 9.sp, letterSpacing = 1.sp)
                         Text(String.format("%.1f MP", source.width.toLong() * source.height.toLong() / 1_000_000f), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                         sourceDetails?.second?.let { size -> Text(formatImageFileSize(size), color = SecondaryText, fontSize = 10.sp) }
+                    }
+                }
+                if (exifDetails.isNotEmpty()) {
+                    Column(Modifier.fillMaxWidth().padding(top = 8.dp).clip(RoundedCornerShape(14.dp)).background(SurfaceDark).padding(12.dp)) {
+                        Text("CAPTURE METADATA", color = Accent, fontSize = 9.sp, letterSpacing = 1.5.sp, fontWeight = FontWeight.Bold)
+                        exifDetails.forEach { (label, value) ->
+                            Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(label, color = SecondaryText, fontSize = 11.sp)
+                                Text(value, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                            }
+                        }
                     }
                 }
                 if (rendered != null && !showOriginal) {
@@ -1089,6 +1102,24 @@ private fun sampleWhiteBalance(bitmap: Bitmap, centerX: Int, centerY: Int): Pair
     val temperatureCorrection = ((b - r) / 56f).coerceIn(-1f, 1f)
     val tintCorrection = (((r + b) * .5f - g) / 12f).coerceIn(-1f, 1f)
     return temperatureCorrection to tintCorrection
+}
+private fun queryImageExifDetails(context: android.content.Context, uri: Uri): List<Pair<String, String>> {
+    return try {
+        val exif = context.contentResolver.openInputStream(uri)?.use { ExifInterface(it) } ?: return emptyList()
+        val fields = listOf(
+            "Date taken" to ExifInterface.TAG_DATETIME_ORIGINAL,
+            "Camera make" to ExifInterface.TAG_MAKE,
+            "Camera model" to ExifInterface.TAG_MODEL,
+            "Lens" to ExifInterface.TAG_LENS_MODEL,
+            "ISO" to ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY,
+            "Exposure" to ExifInterface.TAG_EXPOSURE_TIME,
+            "Aperture" to ExifInterface.TAG_F_NUMBER,
+            "Focal length" to ExifInterface.TAG_FOCAL_LENGTH
+        )
+        fields.mapNotNull { (label, tag) ->
+            exif.getAttribute(tag)?.takeIf { it.isNotBlank() }?.let { label to it }
+        }
+    } catch (_: Exception) { emptyList() }
 }
 private fun queryImageSourceDetails(context: android.content.Context, uri: Uri): Pair<String?, Long?> {
     return try {
