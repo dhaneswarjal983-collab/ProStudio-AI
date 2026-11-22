@@ -799,8 +799,7 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                 }, Modifier.fillMaxWidth(), values.cropOffsetX == 0f && values.cropOffsetY == 0f)
                 AdjustmentSlider("Straighten", values.rotationFine, -45f, 45f) { update(values.copy(rotationFine = it)) }
                 Spacer(Modifier.height(14.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("LINEAR GRADIENT MASK", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                Text("LINEAR GRADIENT MASK", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
                 Text("Feathered selective exposure adjustment.", color = SecondaryText, fontSize = 11.sp)
                 SmallAction(if (values.gradientMaskEnabled) "GRADIENT MASK: ON" else "GRADIENT MASK: OFF", { update(values.copy(gradientMaskEnabled = !values.gradientMaskEnabled)) }, Modifier.fillMaxWidth(), values.gradientMaskEnabled)
                 if (values.gradientMaskEnabled) {
@@ -811,7 +810,8 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                     AdjustmentSlider("Mask feather", values.gradientMaskFeather, 0.05f, 1f) { update(values.copy(gradientMaskFeather = it)) }
                     SmallAction("RESET GRADIENT MASK", { update(values.copy(gradientMaskEnabled = false, gradientMaskCenterX = 0f, gradientMaskCenterY = 0f, gradientMaskAngle = 0f, gradientMaskFeather = 0.55f, gradientMaskExposure = 0f)) }, Modifier.fillMaxWidth())
                 }
-                Text("LIGHT", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("LIGHT", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
                     SmallAction("AUTO", { source?.let { update(autoAdjust(it, values)) } })
                 }
                 SmallAction("RESET LIGHT", { update(values.copy(exposure = 0f, contrast = 1f, highlights = 0f, shadows = 0f, whites = 0f, blacks = 0f)) }, Modifier.fillMaxWidth())
