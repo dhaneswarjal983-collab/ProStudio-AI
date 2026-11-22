@@ -1315,23 +1315,30 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
 
 private fun applyWatermark(source: Bitmap, text: String): Bitmap {
     val output = source.copy(Bitmap.Config.ARGB_8888, true)
-    val canvas = AndroidCanvas(output)
-    val label = text.trim().take(32)
-    if (label.isEmpty()) return output
-    val margin = source.width * 0.035f
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = android.graphics.Color.WHITE
-        alpha = 220
-        textSize = minOf(source.width * 0.038f, source.height * 0.065f).coerceAtLeast(16f)
-        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-        textAlign = Paint.Align.RIGHT
-        setShadowLayer(source.width * 0.008f, 0f, source.width * 0.003f, android.graphics.Color.BLACK)
+    var completed = false
+    try {
+        val label = text.trim().take(32)
+        if (label.isNotEmpty()) {
+            val canvas = AndroidCanvas(output)
+            val margin = source.width * 0.035f
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.WHITE
+                alpha = 220
+                textSize = minOf(source.width * 0.038f, source.height * 0.065f).coerceAtLeast(16f)
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                textAlign = Paint.Align.RIGHT
+                setShadowLayer(source.width * 0.008f, 0f, source.width * 0.003f, android.graphics.Color.BLACK)
+            }
+            val maxWidth = (source.width - margin * 2f).coerceAtLeast(1f)
+            val measured = paint.measureText(label)
+            if (measured > maxWidth) paint.textScaleX = maxWidth / measured
+            canvas.drawText(label, source.width - margin, source.height - margin, paint)
+        }
+        completed = true
+        return output
+    } finally {
+        if (!completed && !output.isRecycled) output.recycle()
     }
-    val maxWidth = (source.width - margin * 2f).coerceAtLeast(1f)
-    val measured = paint.measureText(label)
-    if (measured > maxWidth) paint.textScaleX = maxWidth / measured
-    canvas.drawText(label, source.width - margin, source.height - margin, paint)
-    return output
 }
 private fun sampleWhiteBalance(bitmap: Bitmap, centerX: Int, centerY: Int): Pair<Float, Float> {
     val radius = 4
