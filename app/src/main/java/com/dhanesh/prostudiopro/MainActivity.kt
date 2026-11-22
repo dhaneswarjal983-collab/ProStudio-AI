@@ -4,6 +4,7 @@ import android.content.ContentValues
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.provider.OpenableColumns
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
@@ -167,6 +168,7 @@ private fun StudioApp() {
                     )
                     StudioTab.EDIT -> EditorScreen(
                         source = selectedBitmap,
+                        sourceUri = selectedUri,
                         initialValues = pendingLook,
                         onPick = { tab = StudioTab.LIBRARY },
                         onSaved = { savedCount++ },
@@ -311,9 +313,10 @@ private fun LibraryScreen(selectedUri: Uri?, onSelected: (Uri, Bitmap) -> Unit) 
 }
 
 @Composable
-private fun EditorScreen(source: Bitmap?, initialValues: Adjustments, onPick: () -> Unit, onSaved: () -> Unit, onSaveLook: (Adjustments) -> Unit) {
+private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjustments, onPick: () -> Unit, onSaved: () -> Unit, onSaveLook: (Adjustments) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val sourceDetails = remember(sourceUri) { sourceUri?.let { queryImageSourceDetails(context, it) } }
     var values by remember(source) { mutableStateOf(initialValues) }
     var rendered by remember { mutableStateOf<Bitmap?>(null) }
     var busy by remember { mutableStateOf(false) }
@@ -377,11 +380,13 @@ private fun EditorScreen(source: Bitmap?, initialValues: Adjustments, onPick: ()
                 ) {
                     Column {
                         Text("SOURCE IMAGE", color = Accent, fontSize = 9.sp, letterSpacing = 1.5.sp, fontWeight = FontWeight.Bold)
-                        Text("${source.width} × ${source.height} px", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Text(sourceDetails?.first ?: "Picked photo", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                        Text("${source.width} × ${source.height} px", color = SecondaryText, fontSize = 11.sp)
                     }
                     Column(horizontalAlignment = Alignment.End) {
                         Text("RESOLUTION", color = SecondaryText, fontSize = 9.sp, letterSpacing = 1.sp)
                         Text(String.format("%.1f MP", source.width.toLong() * source.height.toLong() / 1_000_000f), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        sourceDetails?.second?.let { size -> Text(formatImageFileSize(size), color = SecondaryText, fontSize = 10.sp) }
                     }
                 }
                 if (rendered != null && !showOriginal) {
@@ -898,6 +903,30 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
         output.setPixels(row, 0, w, 0, y, w, 1)
     }
     return output
+}
+
+
+private fun queryImageSourceDetails(context: android.content.Context, uri: Uri): Pair<String?, Long?> {
+    return try {
+        context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+            if (!cursor.moveToFirst()) return@use null to null
+            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+            val name = if (nameIndex >= 0) cursor.getString(nameIndex) else null
+            val size = if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) cursor.getLong(sizeIndex) else null
+            name to size
+        } ?: (null to null)
+    } catch (_: Exception) {
+        null to null
+    }
+}
+
+private fun formatImageFileSize(bytes: Long): String {
+    return when {
+        bytes >= 1024L * 1024L -> String.format("%.1f MB", bytes / (1024f * 1024f))
+        bytes >= 1024L -> String.format("%.0f KB", bytes / 1024f)
+        else -> "$bytes bytes"
+    }
 }
 
 private const val CUSTOM_LOOKS_PREFS = "lumen_custom_looks"
