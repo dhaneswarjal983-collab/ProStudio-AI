@@ -686,6 +686,9 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                 val mixNames = listOf("Red", "Orange", "Yellow", "Green", "Aqua", "Blue", "Purple", "Magenta")
                 Text("COLOR MIX", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
                 Text("Adjust individual color ranges without changing every color in the photo.", color = SecondaryText, fontSize = 11.sp)
+                SmallAction("RESET ALL COLOR MIX", {
+                    update(values.copy(colorMixer = List(8) { ColorMix() }))
+                }, Modifier.fillMaxWidth())
                 Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     mixNames.forEachIndexed { index, name ->
                         SmallAction(name.uppercase(), { selectedMix = index }, Modifier.weight(1f))
