@@ -651,6 +651,16 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                             Text("MIDTONES", color = SecondaryText, fontSize = 8.sp)
                             Text("HIGHLIGHTS", color = SecondaryText, fontSize = 8.sp)
                         }
+                        Row(Modifier.fillMaxWidth().padding(top = 7.dp, bottom = 3.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Column {
+                                Text("SHADOW CLIPPING", color = SecondaryText, fontSize = 8.sp)
+                                Text(String.format("%.2f%%", colorAnalysis.shadowClippingPercent), color = Color(0xFF55B9FF), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text("HIGHLIGHT CLIPPING", color = SecondaryText, fontSize = 8.sp)
+                                Text(String.format("%.2f%%", colorAnalysis.highlightClippingPercent), color = Color(0xFFFF5364), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
                         Text("RGB LEVELS", color = Accent, fontSize = 10.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
                         listOf("R" to levels[0], "G" to levels[1], "B" to levels[2]).forEach { (channel, level) ->
                             Row(Modifier.fillMaxWidth().padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1189,7 +1199,9 @@ private fun InfoRow(label: String, value: String) {
 
 private data class PhotoColorAnalysis(
     val histogram: Array<IntArray>,
-    val channelLevels: FloatArray
+    val channelLevels: FloatArray,
+    val shadowClippingPercent: Float,
+    val highlightClippingPercent: Float
 )
 
 private fun samplePhotoColorAnalysis(bitmap: Bitmap): PhotoColorAnalysis {
@@ -1203,6 +1215,8 @@ private fun samplePhotoColorAnalysis(bitmap: Bitmap): PhotoColorAnalysis {
         var redTotal = 0L
         var greenTotal = 0L
         var blueTotal = 0L
+        var shadowClipped = 0
+        var highlightClipped = 0
         pixels.forEach { pixel ->
             val red = (pixel shr 16) and 255
             val green = (pixel shr 8) and 255
@@ -1213,15 +1227,20 @@ private fun samplePhotoColorAnalysis(bitmap: Bitmap): PhotoColorAnalysis {
             redTotal += red
             greenTotal += green
             blueTotal += blue
+            if (red <= 5 && green <= 5 && blue <= 5) shadowClipped++
+            if (red >= 250 && green >= 250 && blue >= 250) highlightClipped++
         }
         val denominator = pixels.size.toFloat() * 255f
+        val pixelPercent = 100f / pixels.size
         return PhotoColorAnalysis(
             histogram = arrayOf(redBins, greenBins, blueBins),
             channelLevels = floatArrayOf(
                 redTotal / denominator,
                 greenTotal / denominator,
                 blueTotal / denominator
-            )
+            ),
+            shadowClippingPercent = shadowClipped * pixelPercent,
+            highlightClippingPercent = highlightClipped * pixelPercent
         )
     } finally {
         if (sample !== bitmap && !sample.isRecycled) sample.recycle()
