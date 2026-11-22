@@ -365,7 +365,10 @@ private fun EditorScreen(source: Bitmap?, initialValues: Adjustments, onPick: ()
                 }
                 AdjustmentSlider("Straighten", values.rotationFine, -45f, 45f) { update(values.copy(rotationFine = it)) }
                 Spacer(Modifier.height(14.dp))
-                Text("LIGHT", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("LIGHT", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                    SmallAction("AUTO", { source?.let { update(autoAdjust(it, values)) } })
+                }
                 AdjustmentSlider("Exposure", values.exposure, -1f, 1f) { update(values.copy(exposure = it)) }
                 AdjustmentSlider("Contrast", values.contrast, .5f, 1.8f) { update(values.copy(contrast = it)) }
                 AdjustmentSlider("Highlights", values.highlights, -1f, 1f) { update(values.copy(highlights = it)) }
@@ -542,6 +545,33 @@ private fun InfoRow(label: String, value: String) {
         Text(value, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
     }
     HorizontalDivider(color = SurfaceRaised)
+}
+
+private fun autoAdjust(source: Bitmap, current: Adjustments): Adjustments {
+    val sample = Bitmap.createScaledBitmap(source, 64, 64, true)
+    val pixels = IntArray(64 * 64)
+    sample.getPixels(pixels, 0, 64, 0, 0, 64, 64)
+    var sum = 0.0
+    var sumSquares = 0.0
+    pixels.forEach { pixel ->
+        val r = ((pixel shr 16) and 255).toDouble()
+        val g = ((pixel shr 8) and 255).toDouble()
+        val b = (pixel and 255).toDouble()
+        val luma = .2126 * r + .7152 * g + .0722 * b
+        sum += luma
+        sumSquares += luma * luma
+    }
+    val mean = (sum / pixels.size).coerceAtLeast(1.0)
+    val variance = (sumSquares / pixels.size - mean * mean).coerceAtLeast(0.0)
+    val deviation = kotlin.math.sqrt(variance)
+    val exposureCorrection = (kotlin.math.ln(118.0 / mean) / kotlin.math.ln(2.0)).toFloat().coerceIn(-1f, 1f)
+    val contrastCorrection = (1.12f - deviation.toFloat() / 255f * .35f).coerceIn(.85f, 1.25f)
+    return current.copy(
+        exposure = exposureCorrection,
+        contrast = contrastCorrection,
+        highlights = if (mean > 145.0) -.12f else 0f,
+        shadows = if (mean < 105.0) .18f else 0f
+    )
 }
 
 private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitmap {
