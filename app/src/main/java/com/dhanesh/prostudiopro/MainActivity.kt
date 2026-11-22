@@ -488,13 +488,13 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
         Bitmap.createBitmap(scaled, 0, 0, scaled.width, scaled.height, matrix, true) else scaled
     val w = input.width
     val h = input.height
-    val pixels = IntArray(w * h)
-    input.getPixels(pixels, 0, w, 0, 0, w, h)
+    val output = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val row = IntArray(w)
     val exposure = Math.pow(2.0, a.exposure.toDouble()).toFloat()
     for (y in 0 until h) {
+        input.getPixels(row, 0, w, 0, y, w, 1)
         for (x in 0 until w) {
-            val i = y * w + x
-            val p = pixels[i]
+            val p = row[x]
             var r = ((p shr 16) and 255).toFloat()
             var g = ((p shr 8) and 255).toFloat()
             var b = (p and 255).toFloat()
@@ -518,10 +518,11 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
             val nx = (x.toFloat() / w - .5f) * 2f
             val ny = (y.toFloat() / h - .5f) * 2f
             val radius = kotlin.math.sqrt(nx * nx + ny * ny)
-            val vignette = (1f - a.vignette * (radius * .55f).coerceIn(0f, .65f))
+            val vignette = 1f - a.vignette * (radius * .55f).coerceIn(0f, .65f)
             r *= vignette; g *= vignette; b *= vignette
             if (a.grain > 0f) {
-                val noise = (((i * 1103515245L + 12345L) shr 16).toInt() and 255) / 127.5f - 1f
+                val pixelIndex = y.toLong() * w + x
+                val noise = (((pixelIndex * 1103515245L + 12345L) shr 16).toInt() and 255) / 127.5f - 1f
                 val amount = noise * a.grain * 14f
                 r += amount; g += amount; b += amount
             }
@@ -529,17 +530,17 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
                 val detail = (a.clarity * .08f + a.dehaze * .05f) * (luma - 128f)
                 r += detail; g += detail; b += detail
             }
-            pixels[i] = android.graphics.Color.argb(
+            row[x] = android.graphics.Color.argb(
                 android.graphics.Color.alpha(p),
                 r.roundToInt().coerceIn(0, 255),
                 g.roundToInt().coerceIn(0, 255),
                 b.roundToInt().coerceIn(0, 255)
             )
         }
+        output.setPixels(row, 0, w, 0, y, w, 1)
     }
-    return Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).also { it.setPixels(pixels, 0, w, 0, 0, w, h) }
+    return output
 }
-
 private fun savePhoto(context: android.content.Context, bitmap: Bitmap): Boolean {
     return try {
         val values = ContentValues().apply {
