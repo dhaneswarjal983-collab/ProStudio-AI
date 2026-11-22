@@ -1277,14 +1277,16 @@ private fun samplePhotoColorAnalysis(bitmap: Bitmap): PhotoColorAnalysis {
 private data class ClippingMarker(val x: Float, val y: Float, val highlight: Boolean)
 
 private fun sampleClippingMarkers(bitmap: Bitmap): List<ClippingMarker> {
-    val maxSide = 240
+    // Keep the overlay lightweight even when large areas are fully clipped.
+    // A 36-step long edge bounds the marker count to roughly 1,300 points.
+    val maxSide = 180
     val scale = minOf(1f, maxSide.toFloat() / maxOf(bitmap.width, bitmap.height))
     val sample = if (scale < 1f) Bitmap.createScaledBitmap(bitmap,
         (bitmap.width * scale).roundToInt().coerceAtLeast(1),
         (bitmap.height * scale).roundToInt().coerceAtLeast(1), true) else bitmap
     try {
         val markers = ArrayList<ClippingMarker>()
-        val step = maxOf(1, maxOf(sample.width, sample.height) / 90)
+        val step = maxOf(1, (maxOf(sample.width, sample.height) + 35) / 36)
         val row = IntArray(sample.width)
         for (y in 0 until sample.height step step) {
             sample.getPixels(row, 0, sample.width, 0, y, sample.width, 1)
