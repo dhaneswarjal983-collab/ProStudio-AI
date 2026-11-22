@@ -33,10 +33,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -119,8 +122,16 @@ private data class Adjustments(
     val radialMaskCenterY: Float = 0f,
     val radialMaskRadius: Float = 0.35f,
     val radialMaskFeather: Float = 0.5f,
-    val radialMaskExposure: Float = 0f
+    val radialMaskExposure: Float = 0f,
+    val brushMaskEnabled: Boolean = false,
+    val brushExposure: Float = 0f,
+    val brushSize: Float = 0.045f,
+    val brushFeather: Float = 0.45f,
+    val brushStrokes: List<BrushStroke> = emptyList()
 )
+
+private data class BrushPoint(val x: Float, val y: Float)
+private data class BrushStroke(val points: List<BrushPoint>, val size: Float, val feather: Float)
 
 private data class ColorMix(
     val hue: Float = 0f,
@@ -428,6 +439,8 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
     var notice by remember { mutableStateOf("") }
     var undo by remember(source, sessionKey) { mutableStateOf(listOf(initialValues)) }
     var undoIndex by remember(source, sessionKey) { mutableIntStateOf(0) }
+    val latestValues by rememberUpdatedState(values)
+    var activeBrushPoints by remember { mutableStateOf(emptyList<BrushPoint>()) }
 
     fun update(next: Adjustments) {
         undo = (undo.take(undoIndex + 1) + next).takeLast(30)
@@ -521,6 +534,55 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                                 }
                             }
                         },
+                    pointerInput(values.brushMaskEnabled, values.brushSize, values.brushFeather, whiteBalancePicker, source, previewSize) {
+                        if (values.brushMaskEnabled && !whiteBalancePicker && source != null) {
+                            fun mapBrushPoint(position: Offset): BrushPoint? {
+                                val preview = rendered ?: source
+                                val boxW = previewSize.width.toFloat()
+                                val boxH = previewSize.height.toFloat()
+                                if (boxW <= 0f || boxH <= 0f) return null
+                                val fit = minOf(boxW / preview.width, boxH / preview.height)
+                                val imageW = preview.width * fit
+                                val imageH = preview.height * fit
+                                val left = (boxW - imageW) / 2f
+                                val top = (boxH - imageH) / 2f
+                                val nx = (position.x - left) / imageW
+                                val ny = (position.y - top) / imageH
+                                return if (nx in 0f..1f && ny in 0f..1f) BrushPoint(nx, ny) else null
+                            }
+                            detectDragGestures(
+                                onDragStart = { position ->
+                                    activeBrushPoints = listOfNotNull(mapBrushPoint(position))
+                                },
+                                onDrag = { change, _ ->
+                                    change.consume()
+                                    val point = mapBrushPoint(change.position)
+                                    if (point != null && activeBrushPoints.size < 1000) {
+                                        val last = activeBrushPoints.lastOrNull()
+                                        if (last == null || kotlin.math.hypot(
+                                                (point.x - last.x).toDouble(),
+                                                (point.y - last.y).toDouble()
+                                            ) >= 0.0015) {
+                                            activeBrushPoints = activeBrushPoints + point
+                                        }
+                                    }
+                                },
+                                onDragEnd = {
+                                    if (activeBrushPoints.isNotEmpty()) {
+                                        update(latestValues.copy(
+                                            brushStrokes = (latestValues.brushStrokes + BrushStroke(
+                                                activeBrushPoints,
+                                                latestValues.brushSize,
+                                                latestValues.brushFeather
+                                            )).takeLast(80)
+                                        ))
+                                    }
+                                    activeBrushPoints = emptyList()
+                                },
+                                onDragCancel = { activeBrushPoints = emptyList() }
+                            )
+                        }
+                    },
                     contentAlignment = Alignment.Center
                 ) {
                     val image = if (showOriginal) source else rendered
@@ -530,6 +592,28 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Fit
                     )
+                    if (values.brushMaskEnabled && image != null) {
+                        Canvas(Modifier.fillMaxSize()) {
+                            val fit = minOf(size.width / image.width, size.height / image.height)
+                            val drawnWidth = image.width * fit
+                            val drawnHeight = image.height * fit
+                            val left = (size.width - drawnWidth) / 2f
+                            val top = (size.height - drawnHeight) / 2f
+                            val brushWidth = (values.brushSize * minOf(drawnWidth, drawnHeight)).coerceAtLeast(2f)
+                            (values.brushStrokes.map { it.points } + listOf(activeBrushPoints)).forEach { points ->
+                                if (points.size == 1) {
+                                    drawCircle(Color(0xFFD5F36A).copy(alpha = .72f), brushWidth / 2f,
+                                        Offset(left + points[0].x * drawnWidth, top + points[0].y * drawnHeight))
+                                } else if (points.size > 1) {
+                                    val path = Path().apply {
+                                        moveTo(left + points.first().x * drawnWidth, top + points.first().y * drawnHeight)
+                                        points.drop(1).forEach { lineTo(left + it.x * drawnWidth, top + it.y * drawnHeight) }
+                                    }
+                                    drawPath(path, Color(0xFFD5F36A).copy(alpha = .72f), style = Stroke(width = brushWidth))
+                                }
+                            }
+                        }
+                    }
                     if (compositionGuide != 0 && image != null) {
                         Canvas(Modifier.fillMaxSize()) {
                             val fit = minOf(size.width / image.width, size.height / image.height)
@@ -815,6 +899,27 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                     AdjustmentSlider("Mask vertical position", values.gradientMaskCenterY, -0.5f, 0.5f) { update(values.copy(gradientMaskCenterY = it)) }
                     AdjustmentSlider("Mask feather", values.gradientMaskFeather, 0.05f, 1f) { update(values.copy(gradientMaskFeather = it)) }
                     SmallAction("RESET GRADIENT MASK", { update(values.copy(gradientMaskEnabled = false, gradientMaskCenterX = 0f, gradientMaskCenterY = 0f, gradientMaskAngle = 0f, gradientMaskFeather = 0.55f, gradientMaskExposure = 0f)) }, Modifier.fillMaxWidth())
+                }
+                Text("BRUSH MASK", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 14.dp))
+                Text("Paint directly on the photo to apply selective exposure.", color = SecondaryText, fontSize = 11.sp)
+                SmallAction(if (values.brushMaskEnabled) "BRUSH PAINT: ON" else "BRUSH PAINT: OFF", {
+                    update(values.copy(brushMaskEnabled = !values.brushMaskEnabled))
+                    whiteBalancePicker = false
+                }, Modifier.fillMaxWidth(), values.brushMaskEnabled)
+                if (values.brushMaskEnabled) {
+                    AdjustmentSlider("Brush exposure", values.brushExposure, -2f, 2f) { update(values.copy(brushExposure = it)) }
+                    AdjustmentSlider("Brush size", values.brushSize, 0.005f, 0.14f) { update(values.copy(brushSize = it)) }
+                    AdjustmentSlider("Brush feather", values.brushFeather, 0f, 1f) { update(values.copy(brushFeather = it)) }
+                    Text("Paint over the preview image. Each completed stroke is one Undo step.", color = SecondaryText, fontSize = 10.sp)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SmallAction("UNDO BRUSH", {
+                            if (values.brushStrokes.isNotEmpty()) update(values.copy(brushStrokes = values.brushStrokes.dropLast(1)))
+                        }, Modifier.weight(1f), values.brushStrokes.isEmpty())
+                        SmallAction("CLEAR BRUSH", {
+                            update(values.copy(brushStrokes = emptyList(), brushMaskEnabled = false, brushExposure = 0f))
+                            activeBrushPoints = emptyList()
+                        }, Modifier.weight(1f), values.brushStrokes.isEmpty())
+                    }
                 }
                 Text("RADIAL MASK", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
                 Text("Feathered circular selective exposure adjustment.", color = SecondaryText, fontSize = 11.sp)
@@ -1403,6 +1508,7 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
     var inputBitmap: Bitmap? = null
     var croppedBitmap: Bitmap? = null
     var outputBitmap: Bitmap? = null
+    var brushMaskBitmap: Bitmap? = null
     var completed = false
     try {
     val matrix = android.graphics.Matrix().apply {
@@ -1429,6 +1535,44 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
     croppedBitmap = cropped
     val w = cropped.width
     val h = cropped.height
+    val brushMask = if (a.brushMaskEnabled && a.brushExposure != 0f && a.brushStrokes.isNotEmpty()) {
+        val maskScale = minOf(1f, 1024f / maxOf(w, h))
+        val maskW = (w * maskScale).roundToInt().coerceAtLeast(1)
+        val maskH = (h * maskScale).roundToInt().coerceAtLeast(1)
+        Bitmap.createBitmap(maskW, maskH, Bitmap.Config.ARGB_8888).also { mask ->
+            brushMaskBitmap = mask
+            mask.eraseColor(android.graphics.Color.BLACK)
+            val maskCanvas = AndroidCanvas(mask)
+            a.brushStrokes.forEach { stroke ->
+                if (stroke.points.isNotEmpty()) {
+                    val width = (stroke.size.coerceIn(0.005f, 0.14f) * minOf(maskW, maskH)).coerceAtLeast(1f)
+                    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = android.graphics.Color.WHITE
+                        style = Paint.Style.STROKE
+                        strokeWidth = width
+                        strokeCap = Paint.Cap.ROUND
+                        strokeJoin = Paint.Join.ROUND
+                        if (stroke.feather > 0f) {
+                            maskFilter = android.graphics.BlurMaskFilter(
+                                (width * stroke.feather.coerceIn(0f, 1f) * 0.5f).coerceAtLeast(0.1f),
+                                android.graphics.BlurMaskFilter.Blur.NORMAL
+                            )
+                        }
+                    }
+                    if (stroke.points.size == 1) {
+                        maskCanvas.drawCircle(stroke.points[0].x * maskW, stroke.points[0].y * maskH, width / 2f, paint)
+                    } else {
+                        val path = android.graphics.Path().apply {
+                            moveTo(stroke.points.first().x * maskW, stroke.points.first().y * maskH)
+                            stroke.points.drop(1).forEach { lineTo(it.x * maskW, it.y * maskH) }
+                        }
+                        maskCanvas.drawPath(path, paint)
+                    }
+                }
+            }
+        }
+    } else null
+    val maskRow = brushMask?.let { IntArray(it.width) }
     val output = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
     outputBitmap = output
     val row = IntArray(w)
@@ -1453,6 +1597,10 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
         cropped.getPixels(row, 0, w, 0, y, w, 1)
         cropped.getPixels(rowAbove, 0, w, 0, (y - 1).coerceAtLeast(0), w, 1)
         cropped.getPixels(rowBelow, 0, w, 0, (y + 1).coerceAtMost(h - 1), w, 1)
+        if (brushMask != null && maskRow != null) {
+            val maskY = (y.toLong() * brushMask.height / h).toInt().coerceIn(0, brushMask.height - 1)
+            brushMask.getPixels(maskRow, 0, brushMask.width, 0, maskY, brushMask.width, 1)
+        }
         for (x in 0 until w) {
             val p = row[x]
             val gradientWeight = if (a.gradientMaskEnabled && a.gradientMaskExposure != 0f) {
@@ -1472,7 +1620,11 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
                 val t = ((radius - distance) / (radius - inner).coerceAtLeast(0.001f)).coerceIn(0f, 1f)
                 t * t * (3f - 2f * t)
             } else 0f
-            val localExposure = Math.pow(2.0, (a.gradientMaskExposure * gradientWeight + a.radialMaskExposure * radialWeight).toDouble()).toFloat()
+            val brushWeight = if (maskRow != null && brushMask != null) {
+                val maskX = (x.toLong() * brushMask.width / w).toInt().coerceIn(0, brushMask.width - 1)
+                ((maskRow[maskX] ushr 24) and 255) / 255f
+            } else 0f
+            val localExposure = Math.pow(2.0, (a.gradientMaskExposure * gradientWeight + a.radialMaskExposure * radialWeight + a.brushExposure * brushWeight).toDouble()).toFloat()
             var r = ((p shr 16) and 255).toFloat()
             var g = ((p shr 8) and 255).toFloat()
             var b = (p and 255).toFloat()
@@ -1587,6 +1739,7 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
         if (outputBitmap != null && !completed && outputBitmap !== source && !outputBitmap.isRecycled) outputBitmap.recycle()
         if (croppedBitmap != null && croppedBitmap !== inputBitmap && croppedBitmap !== source && !croppedBitmap.isRecycled) croppedBitmap.recycle()
         if (inputBitmap != null && inputBitmap !== scaled && inputBitmap !== source && !inputBitmap.isRecycled) inputBitmap.recycle()
+        if (brushMaskBitmap != null && !brushMaskBitmap!!.isRecycled) brushMaskBitmap!!.recycle()
         if (scaled !== source && !scaled.isRecycled) scaled.recycle()
     }
 }
@@ -1852,6 +2005,21 @@ private fun adjustmentsToJson(a: Adjustments): JSONObject = JSONObject().apply {
     put("radialMaskRadius", a.radialMaskRadius)
     put("radialMaskFeather", a.radialMaskFeather)
     put("radialMaskExposure", a.radialMaskExposure)
+    put("brushMaskEnabled", a.brushMaskEnabled)
+    put("brushExposure", a.brushExposure)
+    put("brushSize", a.brushSize)
+    put("brushFeather", a.brushFeather)
+    put("brushStrokes", JSONArray().apply {
+        a.brushStrokes.takeLast(80).forEach { stroke ->
+            put(JSONObject().apply {
+                put("size", stroke.size)
+                put("feather", stroke.feather)
+                put("points", JSONArray().apply {
+                    stroke.points.take(1000).forEach { point -> put(JSONArray().put(point.x).put(point.y)) }
+                })
+            })
+        }
+    })
 }
 
 private fun jsonToAdjustments(json: JSONObject): Adjustments {
@@ -1911,7 +2079,30 @@ private fun jsonToAdjustments(json: JSONObject): Adjustments {
         radialMaskCenterY = json.optDouble("radialMaskCenterY", 0.0).toFloat().coerceIn(-0.5f, 0.5f),
         radialMaskRadius = json.optDouble("radialMaskRadius", 0.35).toFloat().coerceIn(0.05f, 0.75f),
         radialMaskFeather = json.optDouble("radialMaskFeather", 0.5).toFloat().coerceIn(0.05f, 1f),
-        radialMaskExposure = json.optDouble("radialMaskExposure", 0.0).toFloat().coerceIn(-2f, 2f)
+        radialMaskExposure = json.optDouble("radialMaskExposure", 0.0).toFloat().coerceIn(-2f, 2f),
+        brushMaskEnabled = json.optBoolean("brushMaskEnabled", false),
+        brushExposure = json.optDouble("brushExposure", 0.0).toFloat().coerceIn(-2f, 2f),
+        brushSize = json.optDouble("brushSize", 0.045).toFloat().coerceIn(0.005f, 0.14f),
+        brushFeather = json.optDouble("brushFeather", 0.45).toFloat().coerceIn(0f, 1f),
+        brushStrokes = json.optJSONArray("brushStrokes")?.let { strokes ->
+            buildList {
+                for (index in 0 until minOf(strokes.length(), 80)) {
+                    val item = strokes.optJSONObject(index) ?: continue
+                    val pointsJson = item.optJSONArray("points") ?: continue
+                    val points = buildList {
+                        for (pointIndex in 0 until minOf(pointsJson.length(), 1000)) {
+                            val pair = pointsJson.optJSONArray(pointIndex) ?: continue
+                            add(BrushPoint(pair.optDouble(0, -1.0).toFloat().coerceIn(0f, 1f), pair.optDouble(1, -1.0).toFloat().coerceIn(0f, 1f)))
+                        }
+                    }
+                    if (points.isNotEmpty()) add(BrushStroke(
+                        points,
+                        item.optDouble("size", 0.045).toFloat().coerceIn(0.005f, 0.14f),
+                        item.optDouble("feather", 0.45).toFloat().coerceIn(0f, 1f)
+                    ))
+                }
+            }
+        } ?: emptyList()
     )
 }
 
