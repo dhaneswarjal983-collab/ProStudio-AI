@@ -401,7 +401,7 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
     var showOriginal by remember { mutableStateOf(false) }
     var whiteBalancePicker by remember { mutableStateOf(false) }
     var clippingWarning by remember { mutableStateOf(false) }
-    var compositionGrid by remember { mutableStateOf(false) }
+    var compositionGuide by remember { mutableIntStateOf(0) }
     var previewSize by remember { mutableStateOf(IntSize.Zero) }
     val exportPreferences = remember(context) {
         context.getSharedPreferences(EXPORT_SETTINGS_PREFS, android.content.Context.MODE_PRIVATE)
@@ -518,7 +518,7 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Fit
                     )
-                    if (compositionGrid && image != null) {
+                    if (compositionGuide != 0 && image != null) {
                         Canvas(Modifier.fillMaxSize()) {
                             val fit = minOf(size.width / image.width, size.height / image.height)
                             val drawnWidth = image.width * fit
@@ -527,12 +527,27 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                             val top = (size.height - drawnHeight) / 2f
                             val right = left + drawnWidth
                             val bottom = top + drawnHeight
-                            val guideColor = Color.White.copy(alpha = .62f)
-                            for (division in 1..2) {
-                                val x = left + drawnWidth * division / 3f
-                                val y = top + drawnHeight * division / 3f
-                                drawLine(guideColor, Offset(x, top), Offset(x, bottom), strokeWidth = 1.dp.toPx())
-                                drawLine(guideColor, Offset(left, y), Offset(right, y), strokeWidth = 1.dp.toPx())
+                            val centerX = (left + right) / 2f
+                            val centerY = (top + bottom) / 2f
+                            val guideColor = Color.White.copy(alpha = .68f)
+                            val stroke = 1.dp.toPx()
+                            when (compositionGuide) {
+                                1 -> {
+                                    for (division in 1..2) {
+                                        val x = left + drawnWidth * division / 3f
+                                        val y = top + drawnHeight * division / 3f
+                                        drawLine(guideColor, Offset(x, top), Offset(x, bottom), strokeWidth = stroke)
+                                        drawLine(guideColor, Offset(left, y), Offset(right, y), strokeWidth = stroke)
+                                    }
+                                }
+                                2 -> {
+                                    drawLine(guideColor, Offset(centerX, top), Offset(centerX, bottom), strokeWidth = stroke)
+                                    drawLine(guideColor, Offset(left, centerY), Offset(right, centerY), strokeWidth = stroke)
+                                }
+                                3 -> {
+                                    drawLine(guideColor, Offset(left, top), Offset(right, bottom), strokeWidth = stroke)
+                                    drawLine(guideColor, Offset(right, top), Offset(left, bottom), strokeWidth = stroke)
+                                }
                             }
                         }
                     }
@@ -640,7 +655,12 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                 }
                 Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     SmallAction(if (clippingWarning) "CLIPPING: ON" else "CLIPPING: OFF", { clippingWarning = !clippingWarning }, Modifier.weight(1f), clippingWarning)
-                    SmallAction(if (compositionGrid) "GRID: ON" else "GRID: OFF", { compositionGrid = !compositionGrid }, Modifier.weight(1f), compositionGrid)
+                    SmallAction(
+                        when (compositionGuide) { 1 -> "GUIDE: THIRDS"; 2 -> "GUIDE: CENTER"; 3 -> "GUIDE: DIAGONAL"; else -> "GUIDE: OFF" },
+                        { compositionGuide = (compositionGuide + 1) % 4 },
+                        Modifier.weight(1f),
+                        compositionGuide != 0
+                    )
                     SmallAction("BEFORE / AFTER", { showOriginal = !showOriginal }, Modifier.weight(1f))
                 }
                 if (clippingWarning) {
