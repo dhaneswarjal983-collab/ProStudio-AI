@@ -571,21 +571,27 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                 }
                 if (rendered != null && !showOriginal) {
                     val levels = remember(rendered) { sampleChannelLevels(rendered!!) }
-                    val histogram = remember(rendered) { sampleLuminanceHistogram(rendered!!) }
+                    val histogram = remember(rendered) { sampleRgbHistogram(rendered!!) }
                     Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)) {
-                        Text("LUMINANCE HISTOGRAM", color = Accent, fontSize = 10.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                        Text("RGB HISTOGRAM", color = Accent, fontSize = 10.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
                         Canvas(Modifier.fillMaxWidth().height(74.dp).padding(top = 7.dp, bottom = 5.dp)) {
-                            val maxBin = (histogram.maxOrNull() ?: 1).coerceAtLeast(1).toFloat()
-                            val slot = size.width / histogram.size
-                            histogram.forEachIndexed { index, count ->
-                                val barHeight = (count / maxBin) * size.height
-                                val x = index * slot
-                                drawLine(
-                                    color = Color(0xFFB7D66A),
-                                    start = Offset(x + slot * .5f, size.height),
-                                    end = Offset(x + slot * .5f, size.height - barHeight),
-                                    strokeWidth = (slot * .82f).coerceAtLeast(1f)
-                                )
+                            val maxBin = histogram.maxOfOrNull { it.maxOrNull() ?: 0 }
+                                .coerceAtLeast(1).toFloat()
+                            val slot = size.width / histogram[0].size
+                            val channelColors = listOf(
+                                Color(0xBFFF5C5C), Color(0xBF62D98B), Color(0xBF659BFF)
+                            )
+                            histogram.forEachIndexed { channel, bins ->
+                                bins.forEachIndexed { index, count ->
+                                    val barHeight = (count / maxBin) * size.height
+                                    val x = index * slot
+                                    drawLine(
+                                        color = channelColors[channel],
+                                        start = Offset(x + slot * .5f, size.height),
+                                        end = Offset(x + slot * .5f, size.height - barHeight),
+                                        strokeWidth = (slot * .72f).coerceAtLeast(1f)
+                                    )
+                                }
                             }
                         }
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -1078,6 +1084,25 @@ private fun InfoRow(label: String, value: String) {
         Text(value, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
     }
     HorizontalDivider(color = SurfaceRaised)
+}
+
+private fun sampleRgbHistogram(bitmap: Bitmap): Array<IntArray> {
+    val sample = Bitmap.createScaledBitmap(bitmap, 128, 128, true)
+    try {
+        val pixels = IntArray(128 * 128)
+        sample.getPixels(pixels, 0, 128, 0, 0, 128, 128)
+        val redBins = IntArray(32)
+        val greenBins = IntArray(32)
+        val blueBins = IntArray(32)
+        pixels.forEach { pixel ->
+            redBins[(((pixel shr 16) and 255) * 32 / 256).coerceIn(0, 31)]++
+            greenBins[(((pixel shr 8) and 255) * 32 / 256).coerceIn(0, 31)]++
+            blueBins[((pixel and 255) * 32 / 256).coerceIn(0, 31)]++
+        }
+        return arrayOf(redBins, greenBins, blueBins)
+    } finally {
+        if (sample !== bitmap && !sample.isRecycled) sample.recycle()
+    }
 }
 
 private fun sampleLuminanceHistogram(bitmap: Bitmap): IntArray {
