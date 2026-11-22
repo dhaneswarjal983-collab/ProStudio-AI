@@ -686,6 +686,11 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                     }
                 }
                 val activeMix = values.colorMixer[selectedMix]
+                SmallAction("RESET ${mixNames[selectedMix].uppercase()} MIX", {
+                    val updated = values.colorMixer.toMutableList()
+                    updated[selectedMix] = ColorMix()
+                    update(values.copy(colorMixer = updated))
+                }, Modifier.fillMaxWidth())
                 AdjustmentSlider("Hue", activeMix.hue, -100f, 100f) {
                     val updated = values.colorMixer.toMutableList()
                     updated[selectedMix] = activeMix.copy(hue = it)
