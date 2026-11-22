@@ -690,6 +690,11 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                         SmallAction(label, { update(values.copy(cropRatio = ratio)) }, Modifier.weight(1f), values.cropRatio == ratio)
                     }
                 }
+                Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    listOf("4:5" to .8f, "5:4" to 1.25f, "9:16" to (9f / 16f), "2:1" to 2f, "2.39:1" to 2.39f).forEach { (label, ratio) ->
+                        SmallAction(label, { update(values.copy(cropRatio = ratio)) }, Modifier.weight(1f), values.cropRatio == ratio)
+                    }
+                }
                 Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     SmallAction("RESET CROP", {
                         update(values.copy(cropRatio = 0f, cropOffsetX = 0f, cropOffsetY = 0f))
