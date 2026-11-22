@@ -741,18 +741,28 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                         val original = source
                         if (original != null) scope.launch {
                             busy = true
-                            val exportMaxSize = when (exportSize) {
-                                "2048 px" -> 2048
-                                "1600 px" -> 1600
-                                "1200 px" -> 1200
-                                else -> Int.MAX_VALUE
+                            notice = ""
+                            try {
+                                val exportMaxSize = when (exportSize) {
+                                    "2048 px" -> 2048
+                                    "1600 px" -> 1600
+                                    "1200 px" -> 1200
+                                    else -> Int.MAX_VALUE
+                                }
+                                val output = withContext(Dispatchers.Default) { renderPhoto(original, values, exportMaxSize) }
+                                val watermarked = if (watermarkEnabled && watermarkText.isNotBlank()) {
+                                    withContext(Dispatchers.Default) { applyWatermark(output, watermarkText) }
+                                } else output
+                                val saved = withContext(Dispatchers.IO) {
+                                    savePhoto(context, watermarked, exportFormat, exportQuality.roundToInt(), sourceUri, preserveCameraMetadata, exportFileName)
+                                }
+                                notice = if (saved) "Photo exported to Pictures/Lumen Studio." else "Export failed. Check available storage and try again."
+                                if (saved) onSaved()
+                            } catch (_: Exception) {
+                                notice = "Export could not finish. Check available storage and try again."
+                            } finally {
+                                busy = false
                             }
-                            val output = withContext(Dispatchers.Default) { renderPhoto(original, values, exportMaxSize) }
-                            val watermarked = if (watermarkEnabled && watermarkText.isNotBlank()) withContext(Dispatchers.Default) { applyWatermark(output, watermarkText) } else output
-                            val saved = withContext(Dispatchers.IO) { savePhoto(context, watermarked, exportFormat, exportQuality.roundToInt(), sourceUri, preserveCameraMetadata, exportFileName) }
-                            busy = false
-                            notice = if (saved) "Photo exported to Pictures/Lumen Studio." else "Export failed. Please try again."
-                            if (saved) onSaved()
                         }
                     },
                     enabled = !busy,
