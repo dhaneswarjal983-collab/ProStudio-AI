@@ -131,7 +131,7 @@ private data class Adjustments(
 )
 
 private data class BrushPoint(val x: Float, val y: Float)
-private data class BrushStroke(val points: List<BrushPoint>, val size: Float, val feather: Float)
+private data class BrushStroke(val points: List<BrushPoint>, val size: Float, val feather: Float, val erase: Boolean = false)
 
 private data class ColorMix(
     val hue: Float = 0f,
@@ -441,6 +441,7 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
     var undoIndex by remember(source, sessionKey) { mutableIntStateOf(0) }
     val latestValues by rememberUpdatedState(values)
     var activeBrushPoints by remember { mutableStateOf(emptyList<BrushPoint>()) }
+    var brushEraseMode by remember { mutableStateOf(false) }
 
     fun update(next: Adjustments) {
         undo = (undo.take(undoIndex + 1) + next).takeLast(30)
@@ -534,7 +535,7 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                                 }
                             }
                         },
-                    pointerInput(values.brushMaskEnabled, values.brushSize, values.brushFeather, whiteBalancePicker, source, previewSize, rendered) {
+                    pointerInput(values.brushMaskEnabled, values.brushSize, values.brushFeather, whiteBalancePicker, source, previewSize, rendered, brushEraseMode) {
                         if (values.brushMaskEnabled && !whiteBalancePicker && source != null) {
                             fun mapBrushPoint(position: Offset): BrushPoint? {
                                 val preview = rendered ?: source
@@ -573,7 +574,8 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                                             brushStrokes = (latestValues.brushStrokes + BrushStroke(
                                                 activeBrushPoints,
                                                 latestValues.brushSize,
-                                                latestValues.brushFeather
+                                                latestValues.brushFeather,
+                                                brushEraseMode
                                              )).takeLast(40)
                                         ))
                                     }
@@ -600,17 +602,18 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                             val left = (size.width - drawnWidth) / 2f
                             val top = (size.height - drawnHeight) / 2f
                             val brushWidth = (values.brushSize * minOf(drawnWidth, drawnHeight)).coerceAtLeast(2f)
-                            (values.brushStrokes.map { it.points to it.size } + listOf(activeBrushPoints to values.brushSize)).forEach { (points, sizeFraction) ->
+                            (values.brushStrokes.map { Triple(it.points, it.size, it.erase) } + listOf(Triple(activeBrushPoints, values.brushSize, brushEraseMode))).forEach { (points, sizeFraction, erase) ->
                                 val strokeWidth = (sizeFraction * minOf(drawnWidth, drawnHeight)).coerceAtLeast(2f)
+                                val overlayColor = (if (erase) Color(0xFFFF8A65) else Color(0xFFD5F36A)).copy(alpha = .72f)
                                 if (points.size == 1) {
-                                    drawCircle(Color(0xFFD5F36A).copy(alpha = .72f), strokeWidth / 2f,
+                                    drawCircle(overlayColor, strokeWidth / 2f,
                                         Offset(left + points[0].x * drawnWidth, top + points[0].y * drawnHeight))
                                 } else if (points.size > 1) {
                                     val path = Path().apply {
                                         moveTo(left + points.first().x * drawnWidth, top + points.first().y * drawnHeight)
                                         points.drop(1).forEach { lineTo(left + it.x * drawnWidth, top + it.y * drawnHeight) }
                                     }
-                                    drawPath(path, Color(0xFFD5F36A).copy(alpha = .72f), style = Stroke(width = strokeWidth))
+                                    drawPath(path, overlayColor, style = Stroke(width = strokeWidth))
                                 }
                             }
                         }
@@ -903,10 +906,13 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                 }
                 Text("BRUSH MASK", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 14.dp))
                 Text("Paint directly on the photo to apply selective exposure.", color = SecondaryText, fontSize = 11.sp)
-                SmallAction(if (values.brushMaskEnabled) "BRUSH PAINT: ON" else "BRUSH PAINT: OFF", {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SmallAction(if (values.brushMaskEnabled) "BRUSH PAINT: ON" else "BRUSH PAINT: OFF", {
                     update(values.copy(brushMaskEnabled = !values.brushMaskEnabled))
                     whiteBalancePicker = false
-                }, Modifier.fillMaxWidth(), values.brushMaskEnabled)
+                    }, Modifier.weight(1f), values.brushMaskEnabled)
+                    SmallAction(if (brushEraseMode) "ERASER: ON" else "ERASER: OFF", { brushEraseMode = !brushEraseMode }, Modifier.weight(1f), brushEraseMode)
+                }
                 if (values.brushMaskEnabled) {
                     AdjustmentSlider("Brush exposure", values.brushExposure, -2f, 2f) { update(values.copy(brushExposure = it)) }
                     AdjustmentSlider("Brush size", values.brushSize, 0.005f, 0.14f) { update(values.copy(brushSize = it)) }
@@ -1548,7 +1554,7 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
                 if (stroke.points.isNotEmpty()) {
                     val width = (stroke.size.coerceIn(0.005f, 0.14f) * minOf(maskW, maskH)).coerceAtLeast(1f)
                     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        color = android.graphics.Color.WHITE
+                        color = if (stroke.erase) android.graphics.Color.BLACK else android.graphics.Color.WHITE
                         style = if (stroke.points.size == 1) Paint.Style.FILL else Paint.Style.STROKE
                         strokeWidth = width
                         strokeCap = Paint.Cap.ROUND
@@ -2015,6 +2021,7 @@ private fun adjustmentsToJson(a: Adjustments): JSONObject = JSONObject().apply {
             put(JSONObject().apply {
                 put("size", stroke.size)
                 put("feather", stroke.feather)
+                put("erase", stroke.erase)
                 put("points", JSONArray().apply {
                     stroke.points.take(300).forEach { point -> put(JSONArray().put(point.x).put(point.y)) }
                 })
@@ -2099,7 +2106,8 @@ private fun jsonToAdjustments(json: JSONObject): Adjustments {
                     if (points.isNotEmpty()) add(BrushStroke(
                         points,
                         item.optDouble("size", 0.045).toFloat().coerceIn(0.005f, 0.14f),
-                        item.optDouble("feather", 0.45).toFloat().coerceIn(0f, 1f)
+                        item.optDouble("feather", 0.45).toFloat().coerceIn(0f, 1f),
+                        item.optBoolean("erase", false)
                     ))
                 }
             }
