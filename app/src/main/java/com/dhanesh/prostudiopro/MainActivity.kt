@@ -557,7 +557,7 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                                 onDrag = { change, _ ->
                                     change.consume()
                                     val point = mapBrushPoint(change.position)
-                                    if (point != null && activeBrushPoints.size < 1000) {
+                                    if (point != null && activeBrushPoints.size < 300) {
                                         val last = activeBrushPoints.lastOrNull()
                                         if (last == null || kotlin.math.hypot(
                                                 (point.x - last.x).toDouble(),
@@ -574,7 +574,7 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                                                 activeBrushPoints,
                                                 latestValues.brushSize,
                                                 latestValues.brushFeather
-                                            )).takeLast(80)
+                                             )).takeLast(40)
                                         ))
                                     }
                                     activeBrushPoints = emptyList()
@@ -2011,12 +2011,12 @@ private fun adjustmentsToJson(a: Adjustments): JSONObject = JSONObject().apply {
     put("brushSize", a.brushSize)
     put("brushFeather", a.brushFeather)
     put("brushStrokes", JSONArray().apply {
-        a.brushStrokes.takeLast(80).forEach { stroke ->
+        a.brushStrokes.takeLast(40).forEach { stroke ->
             put(JSONObject().apply {
                 put("size", stroke.size)
                 put("feather", stroke.feather)
                 put("points", JSONArray().apply {
-                    stroke.points.take(1000).forEach { point -> put(JSONArray().put(point.x).put(point.y)) }
+                    stroke.points.take(300).forEach { point -> put(JSONArray().put(point.x).put(point.y)) }
                 })
             })
         }
@@ -2087,11 +2087,11 @@ private fun jsonToAdjustments(json: JSONObject): Adjustments {
         brushFeather = json.optDouble("brushFeather", 0.45).toFloat().coerceIn(0f, 1f),
         brushStrokes = json.optJSONArray("brushStrokes")?.let { strokes ->
             buildList {
-                for (index in 0 until minOf(strokes.length(), 80)) {
+                for (index in 0 until minOf(strokes.length(), 40)) {
                     val item = strokes.optJSONObject(index) ?: continue
                     val pointsJson = item.optJSONArray("points") ?: continue
                     val points = buildList {
-                        for (pointIndex in 0 until minOf(pointsJson.length(), 1000)) {
+                        for (pointIndex in 0 until minOf(pointsJson.length(), 300)) {
                             val pair = pointsJson.optJSONArray(pointIndex) ?: continue
                             add(BrushPoint(pair.optDouble(0, -1.0).toFloat().coerceIn(0f, 1f), pair.optDouble(1, -1.0).toFloat().coerceIn(0f, 1f)))
                         }
