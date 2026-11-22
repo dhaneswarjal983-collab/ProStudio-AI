@@ -13,6 +13,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -27,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -351,7 +353,28 @@ private fun EditorScreen(source: Bitmap?, initialValues: Adjustments, onPick: ()
                 }
                 if (rendered != null && !showOriginal) {
                     val levels = remember(rendered) { sampleChannelLevels(rendered!!) }
+                    val histogram = remember(rendered) { sampleLuminanceHistogram(rendered!!) }
                     Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)) {
+                        Text("LUMINANCE HISTOGRAM", color = Accent, fontSize = 10.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                        Canvas(Modifier.fillMaxWidth().height(74.dp).padding(top = 7.dp, bottom = 5.dp)) {
+                            val maxBin = (histogram.maxOrNull() ?: 1).coerceAtLeast(1).toFloat()
+                            val slot = size.width / histogram.size
+                            histogram.forEachIndexed { index, count ->
+                                val barHeight = (count / maxBin) * size.height
+                                val x = index * slot
+                                drawLine(
+                                    color = Color(0xFFB7D66A),
+                                    start = Offset(x + slot * .5f, size.height),
+                                    end = Offset(x + slot * .5f, size.height - barHeight),
+                                    strokeWidth = (slot * .82f).coerceAtLeast(1f)
+                                )
+                            }
+                        }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("SHADOWS", color = SecondaryText, fontSize = 8.sp)
+                            Text("MIDTONES", color = SecondaryText, fontSize = 8.sp)
+                            Text("HIGHLIGHTS", color = SecondaryText, fontSize = 8.sp)
+                        }
                         Text("RGB LEVELS", color = Accent, fontSize = 10.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
                         listOf("R" to levels[0], "G" to levels[1], "B" to levels[2]).forEach { (channel, level) ->
                             Row(Modifier.fillMaxWidth().padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -569,6 +592,22 @@ private fun InfoRow(label: String, value: String) {
         Text(value, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
     }
     HorizontalDivider(color = SurfaceRaised)
+}
+
+private fun sampleLuminanceHistogram(bitmap: Bitmap): IntArray {
+    val sample = Bitmap.createScaledBitmap(bitmap, 128, 128, true)
+    val pixels = IntArray(128 * 128)
+    sample.getPixels(pixels, 0, 128, 0, 0, 128, 128)
+    val bins = IntArray(32)
+    pixels.forEach { pixel ->
+        val r = (pixel shr 16) and 255
+        val g = (pixel shr 8) and 255
+        val b = pixel and 255
+        val luma = (0.2126f * r + 0.7152f * g + 0.0722f * b).roundToInt().coerceIn(0, 255)
+        bins[(luma * bins.size / 256).coerceIn(0, bins.lastIndex)]++
+    }
+    if (sample !== bitmap && sample != bitmap) sample.recycle()
+    return bins
 }
 
 private fun sampleChannelLevels(bitmap: Bitmap): FloatArray {
