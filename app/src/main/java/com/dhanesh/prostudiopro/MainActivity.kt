@@ -655,7 +655,7 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                     SmallAction("AUTO", { source?.let { update(autoAdjust(it, values)) } })
                 }
                 AdjustmentSlider("Exposure", values.exposure, -1f, 1f) { update(values.copy(exposure = it)) }
-                AdjustmentSlider("Contrast", values.contrast, .5f, 1.8f) { update(values.copy(contrast = it)) }
+                AdjustmentSlider("Contrast", values.contrast, .5f, 1.8f, resetValue = 1f) { update(values.copy(contrast = it)) }
                 AdjustmentSlider("Highlights", values.highlights, -1f, 1f) { update(values.copy(highlights = it)) }
                 AdjustmentSlider("Shadows", values.shadows, -1f, 1f) { update(values.copy(shadows = it)) }
                 AdjustmentSlider("Whites", values.whites, -1f, 1f) { update(values.copy(whites = it)) }
@@ -673,7 +673,7 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                     Modifier.fillMaxWidth(), source == null)
                 AdjustmentSlider("Temperature", values.temperature, -1f, 1f) { update(values.copy(temperature = it)) }
                 AdjustmentSlider("Tint", values.tint, -1f, 1f) { update(values.copy(tint = it)) }
-                AdjustmentSlider("Saturation", values.saturation, 0f, 2f) { update(values.copy(saturation = it)) }
+                AdjustmentSlider("Saturation", values.saturation, 0f, 2f, resetValue = 1f) { update(values.copy(saturation = it)) }
                 AdjustmentSlider("Vibrance", values.vibrance, -1f, 1f) { update(values.copy(vibrance = it)) }
                 Spacer(Modifier.height(14.dp))
                 var selectedMix by remember { mutableIntStateOf(0) }
@@ -714,11 +714,11 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                 Spacer(Modifier.height(14.dp))
                 Text("COLOR GRADING", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
                 Text("Tint shadows and highlights independently.", color = SecondaryText, fontSize = 11.sp)
-                AdjustmentSlider("Shadow hue", values.shadowTintHue, 0f, 360f) { update(values.copy(shadowTintHue = it)) }
+                AdjustmentSlider("Shadow hue", values.shadowTintHue, 0f, 360f, resetValue = 220f) { update(values.copy(shadowTintHue = it)) }
                 AdjustmentSlider("Shadow amount", values.shadowTintAmount, 0f, 1f) { update(values.copy(shadowTintAmount = it)) }
-                AdjustmentSlider("Highlight hue", values.highlightTintHue, 0f, 360f) { update(values.copy(highlightTintHue = it)) }
+                AdjustmentSlider("Highlight hue", values.highlightTintHue, 0f, 360f, resetValue = 45f) { update(values.copy(highlightTintHue = it)) }
                 AdjustmentSlider("Highlight amount", values.highlightTintAmount, 0f, 1f) { update(values.copy(highlightTintAmount = it)) }
-                AdjustmentSlider("Midtone hue", values.midtoneTintHue, 0f, 360f) { update(values.copy(midtoneTintHue = it)) }
+                AdjustmentSlider("Midtone hue", values.midtoneTintHue, 0f, 360f, resetValue = 35f) { update(values.copy(midtoneTintHue = it)) }
                 AdjustmentSlider("Midtone amount", values.midtoneTintAmount, 0f, 1f) { update(values.copy(midtoneTintAmount = it)) }
                 AdjustmentSlider("Balance", values.colorGradeBalance, -1f, 1f) { update(values.copy(colorGradeBalance = it)) }
                 Spacer(Modifier.height(14.dp))
@@ -871,11 +871,11 @@ private fun SmallAction(label: String, action: () -> Unit, modifier: Modifier = 
 }
 
 @Composable
-private fun AdjustmentSlider(label: String, value: Float, min: Float, max: Float, onChange: (Float) -> Unit) {
+private fun AdjustmentSlider(label: String, value: Float, min: Float, max: Float, resetValue: Float = 0f, onChange: (Float) -> Unit) {
     Column(Modifier.padding(top = 10.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(label, color = Color.White, fontSize = 13.sp)
-            Text(String.format("%.2f", value), color = SecondaryText, fontSize = 11.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {\n                Text(String.format("%.2f", value), color = SecondaryText, fontSize = 11.sp)\n                Text(\n                    "RESET",\n                    color = Accent,\n                    fontSize = 9.sp,\n                    fontWeight = FontWeight.Bold,\n                    modifier = Modifier.clickable { onChange(resetValue.coerceIn(min, max)) }\n                )\n            }
         }
         Slider(
             value = value.coerceIn(min, max),
