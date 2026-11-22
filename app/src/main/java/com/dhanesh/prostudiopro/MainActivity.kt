@@ -39,6 +39,8 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -117,12 +119,13 @@ private val looks = listOf(
 
 @Composable
 private fun StudioApp() {
+    val context = LocalContext.current
     var tab by remember { mutableStateOf(StudioTab.HOME) }
     var selectedUri by remember { mutableStateOf<Uri?>(null) }
     var selectedBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var savedCount by remember { mutableIntStateOf(0) }
     var pendingLook by remember { mutableStateOf(Adjustments()) }
-    var customLooks by remember { mutableStateOf(emptyList<Look>()) }
+    var customLooks by remember(context) { mutableStateOf(loadCustomLooks(context)) }
     MaterialTheme(colorScheme = darkColorScheme(
         background = Ink, surface = SurfaceDark, primary = Accent,
         onPrimary = Ink, onBackground = Color.White, onSurface = Color.White
@@ -167,7 +170,7 @@ private fun StudioApp() {
                         initialValues = pendingLook,
                         onPick = { tab = StudioTab.LIBRARY },
                         onSaved = { savedCount++ },
-                        onSaveLook = { values -> customLooks = customLooks + Look("My Look ${customLooks.size + 1}", values) }
+                        onSaveLook = { values ->\n                            val updated = customLooks + Look("My Look ${customLooks.size + 1}", values)\n                            customLooks = updated\n                            persistCustomLooks(context, updated)\n                        }
                     )
                     StudioTab.PRESETS -> LooksScreen(
                         customLooks = customLooks,
@@ -409,7 +412,7 @@ private fun EditorScreen(source: Bitmap?, initialValues: Adjustments, onPick: ()
                     }
                 }
                 Button(
-                    onClick = { onSaveLook(values); notice = "Look saved for this session" },
+                    onClick = { onSaveLook(values); notice = "Look saved on this device" },
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = SurfaceRaised)
                 ) {
@@ -863,6 +866,118 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
     }
     return output
 }
+
+private const val CUSTOM_LOOKS_PREFS = "lumen_custom_looks"
+private const val CUSTOM_LOOKS_KEY = "saved_looks"
+
+private fun adjustmentsToJson(a: Adjustments): JSONObject = JSONObject().apply {
+    put("exposure", a.exposure); put("contrast", a.contrast)
+    put("highlights", a.highlights); put("shadows", a.shadows)
+    put("whites", a.whites); put("blacks", a.blacks)
+    put("toneShadows", a.toneShadows); put("toneMidtones", a.toneMidtones)
+    put("toneHighlights", a.toneHighlights); put("temperature", a.temperature)
+    put("tint", a.tint); put("saturation", a.saturation); put("vibrance", a.vibrance)
+    put("clarity", a.clarity); put("dehaze", a.dehaze); put("vignette", a.vignette)
+    put("grain", a.grain); put("sharpening", a.sharpening); put("noiseReduction", a.noiseReduction)
+    put("shadowTintHue", a.shadowTintHue); put("shadowTintAmount", a.shadowTintAmount)
+    put("highlightTintHue", a.highlightTintHue); put("highlightTintAmount", a.highlightTintAmount)
+    put("midtoneTintHue", a.midtoneTintHue); put("midtoneTintAmount", a.midtoneTintAmount)
+    put("colorGradeBalance", a.colorGradeBalance); put("rotation", a.rotation)
+    put("rotationFine", a.rotationFine); put("flipHorizontal", a.flipHorizontal)
+    put("flipVertical", a.flipVertical); put("cropRatio", a.cropRatio)
+    put("cropOffsetX", a.cropOffsetX); put("cropOffsetY", a.cropOffsetY)
+    put("colorMixer", JSONArray().apply {
+        a.colorMixer.forEach { mix ->
+            put(JSONObject().apply {
+                put("hue", mix.hue); put("saturation", mix.saturation); put("luminance", mix.luminance)
+            })
+        }
+    })
+}
+
+private fun jsonToAdjustments(json: JSONObject): Adjustments {
+    val mixerJson = json.optJSONArray("colorMixer")
+    val mixer = if (mixerJson == null) List(8) { ColorMix() } else
+        List(8) { index ->
+            val item = mixerJson.optJSONObject(index) ?: JSONObject()
+            ColorMix(
+                hue = item.optDouble("hue", 0.0).toFloat(),
+                saturation = item.optDouble("saturation", 0.0).toFloat(),
+                luminance = item.optDouble("luminance", 0.0).toFloat()
+            )
+        }
+    return Adjustments(
+        exposure = json.optDouble("exposure", 0.0).toFloat(),
+        contrast = json.optDouble("contrast", 1.0).toFloat(),
+        highlights = json.optDouble("highlights", 0.0).toFloat(),
+        shadows = json.optDouble("shadows", 0.0).toFloat(),
+        whites = json.optDouble("whites", 0.0).toFloat(),
+        blacks = json.optDouble("blacks", 0.0).toFloat(),
+        toneShadows = json.optDouble("toneShadows", 0.0).toFloat(),
+        toneMidtones = json.optDouble("toneMidtones", 0.0).toFloat(),
+        toneHighlights = json.optDouble("toneHighlights", 0.0).toFloat(),
+        temperature = json.optDouble("temperature", 0.0).toFloat(),
+        tint = json.optDouble("tint", 0.0).toFloat(),
+        saturation = json.optDouble("saturation", 1.0).toFloat(),
+        vibrance = json.optDouble("vibrance", 0.0).toFloat(),
+        clarity = json.optDouble("clarity", 0.0).toFloat(),
+        dehaze = json.optDouble("dehaze", 0.0).toFloat(),
+        vignette = json.optDouble("vignette", 0.0).toFloat(),
+        grain = json.optDouble("grain", 0.0).toFloat(),
+        sharpening = json.optDouble("sharpening", 0.0).toFloat(),
+        noiseReduction = json.optDouble("noiseReduction", 0.0).toFloat(),
+        shadowTintHue = json.optDouble("shadowTintHue", 220.0).toFloat(),
+        shadowTintAmount = json.optDouble("shadowTintAmount", 0.0).toFloat(),
+        highlightTintHue = json.optDouble("highlightTintHue", 45.0).toFloat(),
+        highlightTintAmount = json.optDouble("highlightTintAmount", 0.0).toFloat(),
+        midtoneTintHue = json.optDouble("midtoneTintHue", 35.0).toFloat(),
+        midtoneTintAmount = json.optDouble("midtoneTintAmount", 0.0).toFloat(),
+        colorGradeBalance = json.optDouble("colorGradeBalance", 0.0).toFloat(),
+        rotation = json.optInt("rotation", 0),
+        rotationFine = json.optDouble("rotationFine", 0.0).toFloat(),
+        flipHorizontal = json.optBoolean("flipHorizontal", false),
+        flipVertical = json.optBoolean("flipVertical", false),
+        cropRatio = json.optDouble("cropRatio", 0.0).toFloat(),
+        cropOffsetX = json.optDouble("cropOffsetX", 0.0).toFloat(),
+        cropOffsetY = json.optDouble("cropOffsetY", 0.0).toFloat(),
+        colorMixer = mixer
+    )
+}
+
+private fun persistCustomLooks(context: android.content.Context, looks: List<Look>) {
+    try {
+        val array = JSONArray()
+        looks.forEach { look ->
+            array.put(JSONObject().apply {
+                put("name", look.name)
+                put("values", adjustmentsToJson(look.values))
+            })
+        }
+        context.getSharedPreferences(CUSTOM_LOOKS_PREFS, android.content.Context.MODE_PRIVATE)
+            .edit().putString(CUSTOM_LOOKS_KEY, array.toString()).apply()
+    } catch (_: Exception) {
+        // Keep the current in-memory list; a later save can retry persistence.
+    }
+}
+
+private fun loadCustomLooks(context: android.content.Context): List<Look> {
+    return try {
+        val raw = context.getSharedPreferences(CUSTOM_LOOKS_PREFS, android.content.Context.MODE_PRIVATE)
+            .getString(CUSTOM_LOOKS_KEY, null) ?: return emptyList()
+        val array = JSONArray(raw)
+        buildList {
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                val name = item.optString("name").takeIf { it.isNotBlank() } ?: "My Look ${index + 1}"
+                val values = item.optJSONObject("values") ?: continue
+                add(Look(name, jsonToAdjustments(values)))
+            }
+        }
+    } catch (_: Exception) {
+        emptyList()
+    }
+}
+
 private fun savePhoto(context: android.content.Context, bitmap: Bitmap, format: String, quality: Int): Boolean {
     return try {
         val isPng = format == "PNG"
