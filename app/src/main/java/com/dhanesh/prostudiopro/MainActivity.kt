@@ -91,7 +91,8 @@ private fun StudioApp() {
     var tab by remember { mutableStateOf(StudioTab.HOME) }
     var selectedUri by remember { mutableStateOf<Uri?>(null) }
     var selectedBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var savedCount by remember { mutableIntStateOf(0) }\n    var pendingLook by remember { mutableStateOf(Adjustments()) }
+    var savedCount by remember { mutableIntStateOf(0) }
+    var pendingLook by remember { mutableStateOf(Adjustments()) }
     MaterialTheme(colorScheme = darkColorScheme(
         background = Ink, surface = SurfaceDark, primary = Accent,
         onPrimary = Ink, onBackground = Color.White, onSurface = Color.White
