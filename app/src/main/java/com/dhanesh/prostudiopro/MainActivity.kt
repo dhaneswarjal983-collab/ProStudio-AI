@@ -65,6 +65,9 @@ private data class Adjustments(
     val shadows: Float = 0f,
     val whites: Float = 0f,
     val blacks: Float = 0f,
+    val toneShadows: Float = 0f,
+    val toneMidtones: Float = 0f,
+    val toneHighlights: Float = 0f,
     val temperature: Float = 0f,
     val tint: Float = 0f,
     val saturation: Float = 1f,
@@ -363,6 +366,12 @@ private fun EditorScreen(source: Bitmap?, initialValues: Adjustments, onPick: ()
                 AdjustmentSlider("Whites", values.whites, -1f, 1f) { update(values.copy(whites = it)) }
                 AdjustmentSlider("Blacks", values.blacks, -1f, 1f) { update(values.copy(blacks = it)) }
                 Spacer(Modifier.height(14.dp))
+                Text("TONE CURVE", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                Text("Parametric control for shadow, midtone and highlight regions.", color = SecondaryText, fontSize = 11.sp)
+                AdjustmentSlider("Shadow curve", values.toneShadows, -1f, 1f) { update(values.copy(toneShadows = it)) }
+                AdjustmentSlider("Midtone curve", values.toneMidtones, -1f, 1f) { update(values.copy(toneMidtones = it)) }
+                AdjustmentSlider("Highlight curve", values.toneHighlights, -1f, 1f) { update(values.copy(toneHighlights = it)) }
+                Spacer(Modifier.height(14.dp))
                 Text("COLOR", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
                 AdjustmentSlider("Temperature", values.temperature, -1f, 1f) { update(values.copy(temperature = it)) }
                 AdjustmentSlider("Tint", values.tint, -1f, 1f) { update(values.copy(tint = it)) }
@@ -552,8 +561,11 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
             val luma = .2126f * r + .7152f * g + .0722f * b
             val shadowMask = 1f - (luma / 255f).coerceIn(0f, 1f)
             val highlightMask = (luma / 255f).coerceIn(0f, 1f)
+            val midtoneMask = (1f - abs(luma / 255f - .5f) * 2f).coerceIn(0f, 1f)
             val tonal = (a.shadows * shadowMask * 42f) + (a.highlights * highlightMask * 42f) +
-                (a.whites * highlightMask * 24f) + (a.blacks * shadowMask * 24f)
+                (a.whites * highlightMask * 24f) + (a.blacks * shadowMask * 24f) +
+                (a.toneShadows * shadowMask * 32f) + (a.toneMidtones * midtoneMask * 32f) +
+                (a.toneHighlights * highlightMask * 32f)
             r = (r * exposure + tonal - 128f) * a.contrast + 128f
             g = (g * exposure + tonal - 128f) * a.contrast + 128f
             b = (b * exposure + tonal - 128f) * a.contrast + 128f
