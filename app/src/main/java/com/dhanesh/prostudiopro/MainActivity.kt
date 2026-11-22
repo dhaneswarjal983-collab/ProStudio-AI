@@ -107,7 +107,13 @@ private data class Adjustments(
     val cropRatio: Float = 0f,
     val cropOffsetX: Float = 0f,
     val cropOffsetY: Float = 0f,
-    val colorMixer: List<ColorMix> = List(8) { ColorMix() }
+    val colorMixer: List<ColorMix> = List(8) { ColorMix() },
+    val gradientMaskEnabled: Boolean = false,
+    val gradientMaskCenterX: Float = 0f,
+    val gradientMaskCenterY: Float = 0f,
+    val gradientMaskAngle: Float = 0f,
+    val gradientMaskFeather: Float = 0.55f,
+    val gradientMaskExposure: Float = 0f
 )
 
 private data class ColorMix(
@@ -794,7 +800,18 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                 AdjustmentSlider("Straighten", values.rotationFine, -45f, 45f) { update(values.copy(rotationFine = it)) }
                 Spacer(Modifier.height(14.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("LIGHT", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                    Text("LINEAR GRADIENT MASK", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                Text("Feathered selective exposure adjustment.", color = SecondaryText, fontSize = 11.sp)
+                SmallAction(if (values.gradientMaskEnabled) "GRADIENT MASK: ON" else "GRADIENT MASK: OFF", { update(values.copy(gradientMaskEnabled = !values.gradientMaskEnabled)) }, Modifier.fillMaxWidth(), values.gradientMaskEnabled)
+                if (values.gradientMaskEnabled) {
+                    AdjustmentSlider("Mask exposure", values.gradientMaskExposure, -2f, 2f) { update(values.copy(gradientMaskExposure = it)) }
+                    AdjustmentSlider("Mask angle", values.gradientMaskAngle, -180f, 180f) { update(values.copy(gradientMaskAngle = it)) }
+                    AdjustmentSlider("Mask horizontal position", values.gradientMaskCenterX, -0.5f, 0.5f) { update(values.copy(gradientMaskCenterX = it)) }
+                    AdjustmentSlider("Mask vertical position", values.gradientMaskCenterY, -0.5f, 0.5f) { update(values.copy(gradientMaskCenterY = it)) }
+                    AdjustmentSlider("Mask feather", values.gradientMaskFeather, 0.05f, 1f) { update(values.copy(gradientMaskFeather = it)) }
+                    SmallAction("RESET GRADIENT MASK", { update(values.copy(gradientMaskEnabled = false, gradientMaskCenterX = 0f, gradientMaskCenterY = 0f, gradientMaskAngle = 0f, gradientMaskFeather = 0.55f, gradientMaskExposure = 0f)) }, Modifier.fillMaxWidth())
+                }
+                Text("LIGHT", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
                     SmallAction("AUTO", { source?.let { update(autoAdjust(it, values)) } })
                 }
                 SmallAction("RESET LIGHT", { update(values.copy(exposure = 0f, contrast = 1f, highlights = 0f, shadows = 0f, whites = 0f, blacks = 0f)) }, Modifier.fillMaxWidth())
@@ -1421,6 +1438,15 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
         cropped.getPixels(rowBelow, 0, w, 0, (y + 1).coerceAtMost(h - 1), w, 1)
         for (x in 0 until w) {
             val p = row[x]
+            val gradientWeight = if (a.gradientMaskEnabled && a.gradientMaskExposure != 0f) {
+                val nx = x.toFloat() / maxOf(1, w - 1) - 0.5f - a.gradientMaskCenterX
+                val ny = y.toFloat() / maxOf(1, h - 1) - 0.5f - a.gradientMaskCenterY
+                val angle = Math.toRadians(a.gradientMaskAngle.toDouble())
+                val projection = (nx * kotlin.math.cos(angle) + ny * kotlin.math.sin(angle)).toFloat()
+                val edge = a.gradientMaskFeather.coerceIn(0.05f, 1f) * 0.5f
+                ((0.5f - projection) / edge + 0.5f).coerceIn(0f, 1f).let { it * it * (3f - 2f * it) }
+            } else 0f
+            val localExposure = Math.pow(2.0, a.gradientMaskExposure.toDouble() * gradientWeight).toFloat()
             var r = ((p shr 16) and 255).toFloat()
             var g = ((p shr 8) and 255).toFloat()
             var b = (p and 255).toFloat()
@@ -1449,9 +1475,10 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
                 (a.whites * highlightMask * 24f) + (a.blacks * shadowMask * 24f) +
                 (a.toneShadows * shadowMask * 32f) + (a.toneMidtones * midtoneMask * 32f) +
                 (a.toneHighlights * highlightMask * 32f)
-            r = (r * exposure + tonal - 128f) * a.contrast + 128f
-            g = (g * exposure + tonal - 128f) * a.contrast + 128f
-            b = (b * exposure + tonal - 128f) * a.contrast + 128f
+            val combinedExposure = exposure * localExposure
+            r = (r * combinedExposure + tonal - 128f) * a.contrast + 128f
+            g = (g * combinedExposure + tonal - 128f) * a.contrast + 128f
+            b = (b * combinedExposure + tonal - 128f) * a.contrast + 128f
             val warmth = a.temperature * 28f
             r += warmth + a.tint * 8f
             b -= warmth + a.tint * 8f
@@ -1787,6 +1814,12 @@ private fun adjustmentsToJson(a: Adjustments): JSONObject = JSONObject().apply {
             })
         }
     })
+    put("gradientMaskEnabled", a.gradientMaskEnabled)
+    put("gradientMaskCenterX", a.gradientMaskCenterX)
+    put("gradientMaskCenterY", a.gradientMaskCenterY)
+    put("gradientMaskAngle", a.gradientMaskAngle)
+    put("gradientMaskFeather", a.gradientMaskFeather)
+    put("gradientMaskExposure", a.gradientMaskExposure)
 }
 
 private fun jsonToAdjustments(json: JSONObject): Adjustments {
@@ -1834,7 +1867,13 @@ private fun jsonToAdjustments(json: JSONObject): Adjustments {
         cropRatio = json.optDouble("cropRatio", 0.0).toFloat(),
         cropOffsetX = json.optDouble("cropOffsetX", 0.0).toFloat(),
         cropOffsetY = json.optDouble("cropOffsetY", 0.0).toFloat(),
-        colorMixer = mixer
+        colorMixer = mixer,
+        gradientMaskEnabled = json.optBoolean("gradientMaskEnabled", false),
+        gradientMaskCenterX = json.optDouble("gradientMaskCenterX", 0.0).toFloat().coerceIn(-0.5f, 0.5f),
+        gradientMaskCenterY = json.optDouble("gradientMaskCenterY", 0.0).toFloat().coerceIn(-0.5f, 0.5f),
+        gradientMaskAngle = json.optDouble("gradientMaskAngle", 0.0).toFloat().coerceIn(-180f, 180f),
+        gradientMaskFeather = json.optDouble("gradientMaskFeather", 0.55).toFloat().coerceIn(0.05f, 1f),
+        gradientMaskExposure = json.optDouble("gradientMaskExposure", 0.0).toFloat().coerceIn(-2f, 2f)
     )
 }
 
