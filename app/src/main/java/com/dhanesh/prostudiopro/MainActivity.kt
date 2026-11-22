@@ -305,6 +305,7 @@ private fun EditorScreen(source: Bitmap?, initialValues: Adjustments, onPick: ()
     var showOriginal by remember { mutableStateOf(false) }
     var exportFormat by remember { mutableStateOf("JPEG") }
     var exportQuality by remember { mutableFloatStateOf(96f) }
+    var exportSize by remember { mutableStateOf("Original") }
     var notice by remember { mutableStateOf("") }
     var undo by remember(source) { mutableStateOf(listOf(initialValues)) }
     var undoIndex by remember(source) { mutableIntStateOf(0) }
@@ -502,12 +503,23 @@ private fun EditorScreen(source: Bitmap?, initialValues: Adjustments, onPick: ()
                 if (exportFormat == "JPEG") {
                     AdjustmentSlider("JPEG quality", exportQuality, 70f, 100f) { exportQuality = it }
                 }
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("Original", "2048 px", "1600 px", "1200 px").forEach { size ->
+                        SmallAction(size.uppercase(), { exportSize = size }, Modifier.weight(1f), exportSize == size)
+                    }
+                }
                 Button(
                     onClick = {
                         val original = source
                         if (original != null) scope.launch {
                             busy = true
-                            val output = withContext(Dispatchers.Default) { renderPhoto(original, values, Int.MAX_VALUE) }
+                            val exportMaxSize = when (exportSize) {
+                                "2048 px" -> 2048
+                                "1600 px" -> 1600
+                                "1200 px" -> 1200
+                                else -> Int.MAX_VALUE
+                            }
+                            val output = withContext(Dispatchers.Default) { renderPhoto(original, values, exportMaxSize) }
                             val saved = withContext(Dispatchers.IO) { savePhoto(context, output, exportFormat, exportQuality.roundToInt()) }
                             busy = false
                             notice = if (saved) "Photo exported to Pictures/Lumen Studio." else "Export failed. Please try again."
