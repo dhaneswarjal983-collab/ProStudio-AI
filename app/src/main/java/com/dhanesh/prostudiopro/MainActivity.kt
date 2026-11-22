@@ -69,7 +69,7 @@ class MainActivity : ComponentActivity() {
 }
 
 private enum class StudioTab(val label: String) {
-    HOME("Home"), LIBRARY("Library"), EDIT("Edit"), PRESETS("Looks"), PROFILE("Profile")
+    HOME("Home"), LIBRARY("Library"), EDIT("Edit"), PROJECTS("Projects"), PRESETS("Looks"), PROFILE("Profile")
 }
 
 private data class Adjustments(
@@ -116,6 +116,7 @@ private data class ColorMix(
 )
 
 private data class Look(val name: String, val values: Adjustments)
+private data class SavedProject(val id: String, val name: String, val uri: Uri, val values: Adjustments, val updatedAt: Long)
 
 private val looks = listOf(
     Look("Original", Adjustments()),
@@ -135,6 +136,7 @@ private fun StudioApp() {
     var selectedBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var savedCount by remember { mutableIntStateOf(0) }
     var pendingLook by remember { mutableStateOf(restoredSession?.second ?: Adjustments()) }
+    var savedProjects by remember(context) { mutableStateOf(loadSavedProjects(context)) }
     LaunchedEffect(selectedUri) {
         val uri = selectedUri
         if (uri != null && selectedBitmap == null) {
@@ -201,6 +203,37 @@ private fun StudioApp() {
                             val updated = customLooks + Look("My Look ${customLooks.size + 1}", values)
                             customLooks = updated
                             persistCustomLooks(context, updated)
+                        }
+                    )
+                    StudioTab.PROJECTS -> ProjectsScreen(
+                        projects = savedProjects,
+                        hasCurrentPhoto = selectedUri != null,
+                        onSaveCurrent = {
+                            selectedUri?.let { uri ->
+                                val sourceName = queryImageSourceDetails(context, uri).first?.substringBeforeLast(".")?.takeIf { it.isNotBlank() } ?: "Photo"
+                                val project = SavedProject(
+                                    id = java.util.UUID.randomUUID().toString(),
+                                    name = "$sourceName ${savedProjects.size + 1}",
+                                    uri = uri,
+                                    values = pendingLook,
+                                    updatedAt = System.currentTimeMillis()
+                                )
+                                val updated = listOf(project) + savedProjects
+                                savedProjects = updated
+                                persistSavedProjects(context, updated)
+                            }
+                        },
+                        onOpen = { project ->
+                            selectedUri = project.uri
+                            selectedBitmap = null
+                            pendingLook = project.values
+                            persistEditingSession(context, project.uri, project.values)
+                            tab = StudioTab.EDIT
+                        },
+                        onDelete = { project ->
+                            val updated = savedProjects.filterNot { it.id == project.id }
+                            savedProjects = updated
+                            persistSavedProjects(context, updated)
                         }
                     )
                     StudioTab.PRESETS -> LooksScreen(
@@ -343,7 +376,7 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
     val scope = rememberCoroutineScope()
     val sourceDetails = remember(sourceUri) { sourceUri?.let { queryImageSourceDetails(context, it) } }
     val exifDetails = remember(sourceUri) { sourceUri?.let { queryImageExifDetails(context, it) } ?: emptyList() }
-    var values by remember(source) { mutableStateOf(initialValues) }
+    var values by remember(source, initialValues) { mutableStateOf(initialValues) }
     var rendered by remember { mutableStateOf<Bitmap?>(null) }
     var busy by remember { mutableStateOf(false) }
     var showOriginal by remember { mutableStateOf(false) }
@@ -356,8 +389,8 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
     var watermarkEnabled by remember { mutableStateOf(false) }
     var watermarkText by remember { mutableStateOf("Lumen Studio") }
     var notice by remember { mutableStateOf("") }
-    var undo by remember(source) { mutableStateOf(listOf(initialValues)) }
-    var undoIndex by remember(source) { mutableIntStateOf(0) }
+    var undo by remember(source, initialValues) { mutableStateOf(listOf(initialValues)) }
+    var undoIndex by remember(source, initialValues) { mutableIntStateOf(0) }
 
     fun update(next: Adjustments) {
         undo = (undo.take(undoIndex + 1) + next).takeLast(30)
@@ -783,6 +816,66 @@ private fun LooksScreen(customLooks: List<Look>, onApply: (Look) -> Unit, onDele
 }
 
 @Composable
+private fun ProjectsScreen(
+    projects: List<SavedProject>,
+    hasCurrentPhoto: Boolean,
+    onSaveCurrent: () -> Unit,
+    onOpen: (SavedProject) -> Unit,
+    onDelete: (SavedProject) -> Unit
+) {
+    var deleteTarget by remember { mutableStateOf<SavedProject?>(null) }
+    Page {
+        BrandHeader("YOUR PROJECTS")
+        Text("Keep your edits ready to continue.", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(8.dp))
+        Text("Projects save the selected photo reference and all current editing settings on this device.", color = SecondaryText, fontSize = 13.sp)
+        Spacer(Modifier.height(18.dp))
+        Button(
+            onClick = onSaveCurrent,
+            enabled = hasCurrentPhoto,
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Accent, disabledContainerColor = SurfaceRaised),
+            shape = RoundedCornerShape(15.dp)
+        ) { Text("SAVE CURRENT EDIT AS PROJECT", color = if (hasCurrentPhoto) Ink else SecondaryText, fontWeight = FontWeight.Bold) }
+        Spacer(Modifier.height(20.dp))
+        Text("SAVED ON THIS DEVICE  ·  ${projects.size}", color = SecondaryText, fontSize = 10.sp, letterSpacing = 1.5.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(10.dp))
+        if (projects.isEmpty()) {
+            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(SurfaceDark).padding(22.dp), contentAlignment = Alignment.Center) {
+                Text("No saved projects yet. Open a photo, make an edit and save it here.", color = SecondaryText, fontSize = 13.sp)
+            }
+        }
+        projects.forEach { project ->
+            Row(
+                Modifier.fillMaxWidth().padding(bottom = 10.dp).clip(RoundedCornerShape(16.dp))
+                    .background(SurfaceDark).padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(Accent.copy(alpha = .16f)), contentAlignment = Alignment.Center) {
+                    Text("P", color = Accent, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                }
+                Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                    Text(project.name, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                    Text(java.text.SimpleDateFormat("dd MMM yyyy, HH:mm", java.util.Locale.getDefault()).format(java.util.Date(project.updatedAt)), color = SecondaryText, fontSize = 10.sp)
+                }
+                Text("OPEN", color = Accent, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { onOpen(project) }.padding(8.dp))
+                Text("×", color = Color(0xFFFF8A80), fontSize = 20.sp, modifier = Modifier.clickable { deleteTarget = project }.padding(6.dp))
+            }
+        }
+        deleteTarget?.let { target ->
+            AlertDialog(
+                onDismissRequest = { deleteTarget = null },
+                title = { Text("Delete project?") },
+                text = { Text("This saved project entry and its edit settings will be removed from this device. The original photo will not be deleted.") },
+                confirmButton = { TextButton(onClick = { onDelete(target); deleteTarget = null }) { Text("DELETE", color = Color(0xFFFF8A80)) } },
+                dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text("CANCEL") } },
+                containerColor = SurfaceDark, titleContentColor = Color.White, textContentColor = SecondaryText
+            )
+        }
+    }
+}
+
+@Composable
 private fun ProfileScreen(savedCount: Int) {
     Page {
         BrandHeader("YOUR STUDIO")
@@ -1142,6 +1235,48 @@ private fun formatImageFileSize(bytes: Long): String {
         bytes >= 1024L -> String.format("%.0f KB", bytes / 1024f)
         else -> "$bytes bytes"
     }
+}
+
+private const val SAVED_PROJECTS_PREFS = "lumen_saved_projects"
+private const val SAVED_PROJECTS_KEY = "projects"
+
+private fun persistSavedProjects(context: android.content.Context, projects: List<SavedProject>) {
+    try {
+        val array = JSONArray()
+        projects.forEach { project ->
+            array.put(JSONObject().apply {
+                put("id", project.id)
+                put("name", project.name)
+                put("uri", project.uri.toString())
+                put("values", adjustmentsToJson(project.values))
+                put("updatedAt", project.updatedAt)
+            })
+        }
+        context.getSharedPreferences(SAVED_PROJECTS_PREFS, android.content.Context.MODE_PRIVATE)
+            .edit().putString(SAVED_PROJECTS_KEY, array.toString()).apply()
+    } catch (_: Exception) { }
+}
+
+private fun loadSavedProjects(context: android.content.Context): List<SavedProject> {
+    return try {
+        val raw = context.getSharedPreferences(SAVED_PROJECTS_PREFS, android.content.Context.MODE_PRIVATE)
+            .getString(SAVED_PROJECTS_KEY, null) ?: return emptyList()
+        val array = JSONArray(raw)
+        buildList {
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                val uri = Uri.parse(item.optString("uri")).takeIf { it.scheme == "content" } ?: continue
+                val values = item.optJSONObject("values")?.let(::jsonToAdjustments) ?: continue
+                add(SavedProject(
+                    id = item.optString("id").ifBlank { java.util.UUID.randomUUID().toString() },
+                    name = item.optString("name").ifBlank { "Project ${index + 1}" },
+                    uri = uri,
+                    values = values,
+                    updatedAt = item.optLong("updatedAt", 0L)
+                ))
+            }
+        }
+    } catch (_: Exception) { emptyList() }
 }
 
 private const val EDITING_SESSION_PREFS = "lumen_editing_session"
