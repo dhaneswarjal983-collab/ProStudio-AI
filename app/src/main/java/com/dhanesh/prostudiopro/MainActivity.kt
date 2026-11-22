@@ -652,6 +652,7 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                 Spacer(Modifier.height(14.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text("LIGHT", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                SmallAction("RESET LIGHT", { update(values.copy(exposure = 0f, contrast = 1f, highlights = 0f, shadows = 0f, whites = 0f, blacks = 0f)) }, Modifier.fillMaxWidth())
                     SmallAction("AUTO", { source?.let { update(autoAdjust(it, values)) } })
                 }
                 AdjustmentSlider("Exposure", values.exposure, -1f, 1f) { update(values.copy(exposure = it)) }
@@ -662,12 +663,14 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                 AdjustmentSlider("Blacks", values.blacks, -1f, 1f) { update(values.copy(blacks = it)) }
                 Spacer(Modifier.height(14.dp))
                 Text("TONE CURVE", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                SmallAction("RESET TONE CURVE", { update(values.copy(toneShadows = 0f, toneMidtones = 0f, toneHighlights = 0f)) }, Modifier.fillMaxWidth())
                 Text("Parametric control for shadow, midtone and highlight regions.", color = SecondaryText, fontSize = 11.sp)
                 AdjustmentSlider("Shadow curve", values.toneShadows, -1f, 1f) { update(values.copy(toneShadows = it)) }
                 AdjustmentSlider("Midtone curve", values.toneMidtones, -1f, 1f) { update(values.copy(toneMidtones = it)) }
                 AdjustmentSlider("Highlight curve", values.toneHighlights, -1f, 1f) { update(values.copy(toneHighlights = it)) }
                 Spacer(Modifier.height(14.dp))
                 Text("COLOR", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                SmallAction("RESET COLOR", { update(values.copy(temperature = 0f, tint = 0f, saturation = 1f, vibrance = 0f)) }, Modifier.fillMaxWidth())
                 SmallAction(if (whiteBalancePicker) "CANCEL WHITE BALANCE PICKER" else "WHITE BALANCE PICKER",
                     { whiteBalancePicker = !whiteBalancePicker; notice = if (!whiteBalancePicker) "White balance picker cancelled." else "Preview par neutral ya white area select karein." },
                     Modifier.fillMaxWidth(), source == null)
@@ -708,16 +711,19 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                 }
                 Spacer(Modifier.height(14.dp))
                 Text("EFFECTS", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                SmallAction("RESET EFFECTS", { update(values.copy(clarity = 0f, dehaze = 0f, vignette = 0f, grain = 0f)) }, Modifier.fillMaxWidth())
                 AdjustmentSlider("Clarity", values.clarity, 0f, 1f) { update(values.copy(clarity = it)) }
                 AdjustmentSlider("Dehaze", values.dehaze, 0f, 1f) { update(values.copy(dehaze = it)) }
                 AdjustmentSlider("Vignette", values.vignette, 0f, 1f) { update(values.copy(vignette = it)) }
                 AdjustmentSlider("Grain", values.grain, 0f, 1f) { update(values.copy(grain = it)) }
                 Spacer(Modifier.height(14.dp))
                 Text("DETAIL", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                SmallAction("RESET DETAIL", { update(values.copy(sharpening = 0f, noiseReduction = 0f)) }, Modifier.fillMaxWidth())
                 AdjustmentSlider("Sharpening", values.sharpening, 0f, 1f) { update(values.copy(sharpening = it)) }
                 AdjustmentSlider("Noise reduction", values.noiseReduction, 0f, 1f) { update(values.copy(noiseReduction = it)) }
                 Spacer(Modifier.height(14.dp))
                 Text("COLOR GRADING", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                SmallAction("RESET COLOR GRADING", { update(values.copy(shadowTintHue = 220f, shadowTintAmount = 0f, highlightTintHue = 45f, highlightTintAmount = 0f, midtoneTintHue = 35f, midtoneTintAmount = 0f, colorGradeBalance = 0f)) }, Modifier.fillMaxWidth())
                 Text("Tint shadows and highlights independently.", color = SecondaryText, fontSize = 11.sp)
                 AdjustmentSlider("Shadow hue", values.shadowTintHue, 0f, 360f, resetValue = 220f) { update(values.copy(shadowTintHue = it)) }
                 AdjustmentSlider("Shadow amount", values.shadowTintAmount, 0f, 1f) { update(values.copy(shadowTintAmount = it)) }
