@@ -303,6 +303,8 @@ private fun EditorScreen(source: Bitmap?, initialValues: Adjustments, onPick: ()
     var rendered by remember { mutableStateOf<Bitmap?>(null) }
     var busy by remember { mutableStateOf(false) }
     var showOriginal by remember { mutableStateOf(false) }
+    var exportFormat by remember { mutableStateOf("JPEG") }
+    var exportQuality by remember { mutableFloatStateOf(96f) }
     var notice by remember { mutableStateOf("") }
     var undo by remember(source) { mutableStateOf(listOf(initialValues)) }
     var undoIndex by remember(source) { mutableIntStateOf(0) }
@@ -491,13 +493,22 @@ private fun EditorScreen(source: Bitmap?, initialValues: Adjustments, onPick: ()
                     }
                 }
                 Spacer(Modifier.height(16.dp))
+                Text("EXPORT SETTINGS", color = Accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                Text("Choose an output format and JPEG quality.", color = SecondaryText, fontSize = 11.sp)
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SmallAction("JPEG", { exportFormat = "JPEG" }, Modifier.weight(1f), exportFormat == "JPEG")
+                    SmallAction("PNG", { exportFormat = "PNG" }, Modifier.weight(1f), exportFormat == "PNG")
+                }
+                if (exportFormat == "JPEG") {
+                    AdjustmentSlider("JPEG quality", exportQuality, 70f, 100f) { exportQuality = it }
+                }
                 Button(
                     onClick = {
                         val original = source
                         if (original != null) scope.launch {
                             busy = true
                             val output = withContext(Dispatchers.Default) { renderPhoto(original, values, Int.MAX_VALUE) }
-                            val saved = withContext(Dispatchers.IO) { savePhoto(context, output) }
+                            val saved = withContext(Dispatchers.IO) { savePhoto(context, output, exportFormat, exportQuality.roundToInt()) }
                             busy = false
                             notice = if (saved) "Photo exported to Pictures/Lumen Studio." else "Export failed. Please try again."
                             if (saved) onSaved()
@@ -815,11 +826,15 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
     }
     return output
 }
-private fun savePhoto(context: android.content.Context, bitmap: Bitmap): Boolean {
+private fun savePhoto(context: android.content.Context, bitmap: Bitmap, format: String, quality: Int): Boolean {
     return try {
+        val isPng = format == "PNG"
+        val extension = if (isPng) "png" else "jpg"
+        val mimeType = if (isPng) "image/png" else "image/jpeg"
+        val compressFormat = if (isPng) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG
         val values = ContentValues().apply {
-            put(MediaStore.Images.Media.DISPLAY_NAME, "Lumen_${System.currentTimeMillis()}.jpg")
-            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            put(MediaStore.Images.Media.DISPLAY_NAME, "Lumen_${System.currentTimeMillis()}.$extension")
+            put(MediaStore.Images.Media.MIME_TYPE, mimeType)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Lumen Studio")
                 put(MediaStore.Images.Media.IS_PENDING, 1)
@@ -827,7 +842,7 @@ private fun savePhoto(context: android.content.Context, bitmap: Bitmap): Boolean
         }
         val resolver = context.contentResolver
         val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return false
-        val success = resolver.openOutputStream(uri)?.use { bitmap.compress(Bitmap.CompressFormat.JPEG, 96, it) } ?: false
+        val success = resolver.openOutputStream(uri)?.use { bitmap.compress(compressFormat, quality.coerceIn(70, 100), it) } ?: false
         if (!success) {
             resolver.delete(uri, null, null)
             return false
