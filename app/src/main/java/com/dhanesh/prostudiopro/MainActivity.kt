@@ -764,6 +764,24 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                         SmallAction(size.uppercase(), { exportSize = size }, Modifier.weight(1f), exportSize == size)
                     }
                 }
+                Text(
+                    text = source?.let { bitmap ->
+                        val maxDimension = when (exportSize) {
+                            "2048 px" -> 2048
+                            "1600 px" -> 1600
+                            "1200 px" -> 1200
+                            else -> Int.MAX_VALUE
+                        }
+                        val scale = if (maxDimension == Int.MAX_VALUE) 1f else minOf(
+                            1f,
+                            maxDimension.toFloat() / maxOf(bitmap.width, bitmap.height)
+                        )
+                        "Output dimensions: ${(bitmap.width * scale).roundToInt()} × ${(bitmap.height * scale).roundToInt()} px"
+                    } ?: "Output dimensions unavailable",
+                    color = SecondaryText,
+                    fontSize = 10.sp,
+                    modifier = Modifier.padding(top = 6.dp)
+                )
                 if (exportFormat == "JPEG") {
                     SmallAction(if (preserveCameraMetadata) "CAMERA METADATA: ON" else "CAMERA METADATA: OFF", { preserveCameraMetadata = !preserveCameraMetadata }, Modifier.fillMaxWidth(), preserveCameraMetadata)
                     Text("Optional camera details only. GPS and device serial data are never copied.", color = SecondaryText, fontSize = 10.sp)
