@@ -344,6 +344,21 @@ private fun EditorScreen(source: Bitmap?, initialValues: Adjustments, onPick: ()
                     )
                     if (busy) CircularProgressIndicator(color = Accent, modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).size(22.dp), strokeWidth = 2.dp)
                 }
+                if (rendered != null && !showOriginal) {
+                    val levels = remember(rendered) { sampleChannelLevels(rendered!!) }
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)) {
+                        Text("RGB LEVELS", color = Accent, fontSize = 10.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                        listOf("R" to levels[0], "G" to levels[1], "B" to levels[2]).forEach { (channel, level) ->
+                            Row(Modifier.fillMaxWidth().padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(channel, color = SecondaryText, fontSize = 10.sp, modifier = Modifier.width(18.dp))
+                                Box(Modifier.weight(1f).height(5.dp).clip(RoundedCornerShape(4.dp)).background(SurfaceDark)) {
+                                    Box(Modifier.fillMaxWidth(level.coerceIn(0f, 1f)).height(5.dp).background(Accent, RoundedCornerShape(4.dp)))
+                                }
+                                Text("${(level * 100).roundToInt()}%", color = SecondaryText, fontSize = 9.sp, modifier = Modifier.width(36.dp), textAlign = TextAlign.End)
+                            }
+                        }
+                    }
+                }
                 Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     SmallAction("BEFORE / AFTER", { showOriginal = !showOriginal }, Modifier.weight(1f))
                     SmallAction("UNDO", { if (undoIndex > 0) { undoIndex--; values = undo[undoIndex] } }, Modifier.weight(1f), undoIndex == 0)
@@ -545,6 +560,23 @@ private fun InfoRow(label: String, value: String) {
         Text(value, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
     }
     HorizontalDivider(color = SurfaceRaised)
+}
+
+private fun sampleChannelLevels(bitmap: Bitmap): FloatArray {
+    val sample = Bitmap.createScaledBitmap(bitmap, 32, 32, true)
+    val pixels = IntArray(32 * 32)
+    sample.getPixels(pixels, 0, 32, 0, 0, 32, 32)
+    var red = 0L
+    var green = 0L
+    var blue = 0L
+    pixels.forEach { pixel ->
+        red += (pixel shr 16) and 255
+        green += (pixel shr 8) and 255
+        blue += pixel and 255
+    }
+    val count = pixels.size.toFloat() * 255f
+    if (sample !== bitmap && sample != bitmap) sample.recycle()
+    return floatArrayOf(red / count, green / count, blue / count)
 }
 
 private fun autoAdjust(source: Bitmap, current: Adjustments): Adjustments {
