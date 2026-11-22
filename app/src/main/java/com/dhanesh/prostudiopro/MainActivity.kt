@@ -1070,29 +1070,33 @@ private fun sampleChannelLevels(bitmap: Bitmap): FloatArray {
 
 private fun autoAdjust(source: Bitmap, current: Adjustments): Adjustments {
     val sample = Bitmap.createScaledBitmap(source, 64, 64, true)
-    val pixels = IntArray(64 * 64)
-    sample.getPixels(pixels, 0, 64, 0, 0, 64, 64)
-    var sum = 0.0
-    var sumSquares = 0.0
-    pixels.forEach { pixel ->
-        val r = ((pixel shr 16) and 255).toDouble()
-        val g = ((pixel shr 8) and 255).toDouble()
-        val b = (pixel and 255).toDouble()
-        val luma = .2126 * r + .7152 * g + .0722 * b
-        sum += luma
-        sumSquares += luma * luma
+    try {
+        val pixels = IntArray(64 * 64)
+        sample.getPixels(pixels, 0, 64, 0, 0, 64, 64)
+        var sum = 0.0
+        var sumSquares = 0.0
+        pixels.forEach { pixel ->
+            val r = ((pixel shr 16) and 255).toDouble()
+            val g = ((pixel shr 8) and 255).toDouble()
+            val b = (pixel and 255).toDouble()
+            val luma = .2126 * r + .7152 * g + .0722 * b
+            sum += luma
+            sumSquares += luma * luma
+        }
+        val mean = (sum / pixels.size).coerceAtLeast(1.0)
+        val variance = (sumSquares / pixels.size - mean * mean).coerceAtLeast(0.0)
+        val deviation = kotlin.math.sqrt(variance)
+        val exposureCorrection = (kotlin.math.ln(118.0 / mean) / kotlin.math.ln(2.0)).toFloat().coerceIn(-1f, 1f)
+        val contrastCorrection = (1.12f - deviation.toFloat() / 255f * .35f).coerceIn(.85f, 1.25f)
+        return current.copy(
+            exposure = exposureCorrection,
+            contrast = contrastCorrection,
+            highlights = if (mean > 145.0) -.12f else 0f,
+            shadows = if (mean < 105.0) .18f else 0f
+        )
+    } finally {
+        if (sample !== source && !sample.isRecycled) sample.recycle()
     }
-    val mean = (sum / pixels.size).coerceAtLeast(1.0)
-    val variance = (sumSquares / pixels.size - mean * mean).coerceAtLeast(0.0)
-    val deviation = kotlin.math.sqrt(variance)
-    val exposureCorrection = (kotlin.math.ln(118.0 / mean) / kotlin.math.ln(2.0)).toFloat().coerceIn(-1f, 1f)
-    val contrastCorrection = (1.12f - deviation.toFloat() / 255f * .35f).coerceIn(.85f, 1.25f)
-    return current.copy(
-        exposure = exposureCorrection,
-        contrast = contrastCorrection,
-        highlights = if (mean > 145.0) -.12f else 0f,
-        shadows = if (mean < 105.0) .18f else 0f
-    )
 }
 
 private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitmap {
