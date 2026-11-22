@@ -474,9 +474,9 @@ private fun InfoRow(label: String, value: String) {
 
 private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitmap {
     val scale = if (maxDimension == Int.MAX_VALUE) 1f else minOf(1f, maxDimension.toFloat() / maxOf(source.width, source.height))
-    val w = (source.width * scale).roundToInt().coerceAtLeast(1)
-    val h = (source.height * scale).roundToInt().coerceAtLeast(1)
-    val scaled = if (w != source.width || h != source.height) Bitmap.createScaledBitmap(source, w, h, true) else source
+    val scaledW = (source.width * scale).roundToInt().coerceAtLeast(1)
+    val scaledH = (source.height * scale).roundToInt().coerceAtLeast(1)
+    val scaled = if (scaledW != source.width || scaledH != source.height) Bitmap.createScaledBitmap(source, scaledW, scaledH, true) else source
     val matrix = android.graphics.Matrix().apply {
         postRotate(a.rotation.toFloat())
         postScale(if (a.flipHorizontal) -1f else 1f, if (a.flipVertical) -1f else 1f)
