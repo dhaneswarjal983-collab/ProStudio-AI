@@ -396,13 +396,16 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
     var whiteBalancePicker by remember { mutableStateOf(false) }
     var clippingWarning by remember { mutableStateOf(false) }
     var previewSize by remember { mutableStateOf(IntSize.Zero) }
-    var exportFormat by remember { mutableStateOf("JPEG") }
-    var exportQuality by remember { mutableFloatStateOf(96f) }
-    var exportSize by remember { mutableStateOf("Original") }
-    var watermarkEnabled by remember { mutableStateOf(false) }
-    var preserveCameraMetadata by remember { mutableStateOf(false) }
-    var exportFileName by remember { mutableStateOf("Lumen_Edit") }
-    var watermarkText by remember { mutableStateOf("Lumen Studio") }
+    val exportPreferences = remember(context) {
+        context.getSharedPreferences(EXPORT_SETTINGS_PREFS, android.content.Context.MODE_PRIVATE)
+    }
+    var exportFormat by remember(context) { mutableStateOf(exportPreferences.getString("format", "JPEG") ?: "JPEG") }
+    var exportQuality by remember(context) { mutableFloatStateOf(exportPreferences.getInt("quality", 96).toFloat().coerceIn(70f, 100f)) }
+    var exportSize by remember(context) { mutableStateOf(exportPreferences.getString("size", "Original") ?: "Original") }
+    var watermarkEnabled by remember(context) { mutableStateOf(exportPreferences.getBoolean("watermark_enabled", false)) }
+    var preserveCameraMetadata by remember(context) { mutableStateOf(exportPreferences.getBoolean("preserve_metadata", false)) }
+    var exportFileName by remember(context) { mutableStateOf(exportPreferences.getString("file_name", "Lumen_Edit") ?: "Lumen_Edit") }
+    var watermarkText by remember(context) { mutableStateOf(exportPreferences.getString("watermark_text", "Lumen Studio") ?: "Lumen Studio") }
     var notice by remember { mutableStateOf("") }
     var undo by remember(source, sessionKey) { mutableStateOf(listOf(initialValues)) }
     var undoIndex by remember(source, sessionKey) { mutableIntStateOf(0) }
@@ -414,6 +417,18 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
     }
 
     LaunchedEffect(values) { onAdjustmentsChange(values) }
+
+    LaunchedEffect(exportFormat, exportQuality, exportSize, watermarkEnabled, preserveCameraMetadata, exportFileName, watermarkText) {
+        exportPreferences.edit()
+            .putString("format", exportFormat)
+            .putInt("quality", exportQuality.roundToInt().coerceIn(70, 100))
+            .putString("size", exportSize)
+            .putBoolean("watermark_enabled", watermarkEnabled)
+            .putBoolean("preserve_metadata", preserveCameraMetadata)
+            .putString("file_name", exportFileName)
+            .putString("watermark_text", watermarkText)
+            .apply()
+    }
 
     LaunchedEffect(source, values) {
         if (source == null) {
@@ -1328,6 +1343,7 @@ private fun formatImageFileSize(bytes: Long): String {
     }
 }
 
+private const val EXPORT_SETTINGS_PREFS = "lumen_export_settings"
 private const val SAVED_PROJECTS_PREFS = "lumen_saved_projects"
 private const val SAVED_PROJECTS_KEY = "projects"
 
