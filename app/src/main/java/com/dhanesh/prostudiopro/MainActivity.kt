@@ -697,6 +697,11 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                 }
                 if (values.cropRatio > 0f) {
                     Text("CUSTOM ASPECT RATIO", color = Accent, fontSize = 10.sp, letterSpacing = 1.5.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
+                    Text(
+                        if (values.cropRatio >= 1f) "${String.format("%.2f", values.cropRatio)} : 1  •  LANDSCAPE"
+                        else "1 : ${String.format("%.2f", 1f / values.cropRatio)}  •  PORTRAIT",
+                        color = SecondaryText, fontSize = 11.sp
+                    )
                     AdjustmentSlider("Fine tune ratio", values.cropRatio, .3f, 3.333f, resetValue = 1f) {
                         update(values.copy(cropRatio = it))
                     }
