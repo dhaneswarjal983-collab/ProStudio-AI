@@ -784,6 +784,16 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                         )
                     )
                 }
+                SmallAction("RESET EXPORT SETTINGS", {
+                    exportFormat = "JPEG"
+                    exportQuality = 96f
+                    exportSize = "Original"
+                    watermarkEnabled = false
+                    preserveCameraMetadata = false
+                    exportFileName = "Lumen_Edit"
+                    watermarkText = "Lumen Studio"
+                    notice = "Export settings restored to defaults."
+                }, Modifier.fillMaxWidth())
                 Button(
                     onClick = {
                         val original = source
