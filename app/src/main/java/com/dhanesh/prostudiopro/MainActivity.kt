@@ -122,6 +122,7 @@ private fun StudioApp() {
     var selectedBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var savedCount by remember { mutableIntStateOf(0) }
     var pendingLook by remember { mutableStateOf(Adjustments()) }
+    var customLooks by remember { mutableStateOf(emptyList<Look>()) }
     MaterialTheme(colorScheme = darkColorScheme(
         background = Ink, surface = SurfaceDark, primary = Accent,
         onPrimary = Ink, onBackground = Color.White, onSurface = Color.White
@@ -165,9 +166,11 @@ private fun StudioApp() {
                         source = selectedBitmap,
                         initialValues = pendingLook,
                         onPick = { tab = StudioTab.LIBRARY },
-                        onSaved = { savedCount++ }
+                        onSaved = { savedCount++ },
+                        onSaveLook = { values -> customLooks = customLooks + Look("My Look ${customLooks.size + 1}", values) }
                     )
                     StudioTab.PRESETS -> LooksScreen(
+                        customLooks = customLooks,
                         onApply = { look -> pendingLook = look.values; tab = if (selectedBitmap != null) StudioTab.EDIT else StudioTab.LIBRARY }
                     )
                     StudioTab.PROFILE -> ProfileScreen(savedCount)
@@ -296,7 +299,7 @@ private fun LibraryScreen(selectedUri: Uri?, onSelected: (Uri, Bitmap) -> Unit) 
 }
 
 @Composable
-private fun EditorScreen(source: Bitmap?, initialValues: Adjustments, onPick: () -> Unit, onSaved: () -> Unit) {
+private fun EditorScreen(source: Bitmap?, initialValues: Adjustments, onPick: () -> Unit, onSaved: () -> Unit, onSaveLook: (Adjustments) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var values by remember(source) { mutableStateOf(initialValues) }
@@ -404,6 +407,13 @@ private fun EditorScreen(source: Bitmap?, initialValues: Adjustments, onPick: ()
                             }
                         }
                     }
+                }
+                Button(
+                    onClick = { onSaveLook(values); notice = "Look saved for this session" },
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = SurfaceRaised)
+                ) {
+                    Text("SAVE CURRENT LOOK", color = Accent, fontWeight = FontWeight.Bold)
                 }
                 Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     SmallAction("BEFORE / AFTER", { showOriginal = !showOriginal }, Modifier.weight(1f))
@@ -582,14 +592,14 @@ private fun AdjustmentSlider(label: String, value: Float, min: Float, max: Float
 }
 
 @Composable
-private fun LooksScreen(onApply: (Look) -> Unit) {
+private fun LooksScreen(customLooks: List<Look>, onApply: (Look) -> Unit) {
     Page {
         BrandHeader("CREATIVE LOOKS")
         Text("A starting point, not a limit.", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(8.dp))
         Text("Original built-in looks can be applied in the editor and fine-tuned with sliders.", color = SecondaryText, fontSize = 13.sp)
         Spacer(Modifier.height(20.dp))
-        looks.forEach { look ->
+        (looks + customLooks).forEach { look ->
             Row(
                 Modifier.fillMaxWidth().padding(bottom = 10.dp).clip(RoundedCornerShape(17.dp))
                     .background(SurfaceDark).clickable { onApply(look) }.padding(17.dp),
@@ -600,7 +610,7 @@ private fun LooksScreen(onApply: (Look) -> Unit) {
                 }
                 Column(Modifier.weight(1f).padding(start = 13.dp)) {
                     Text(look.name, color = Color.White, fontWeight = FontWeight.Bold)
-                    Text("Original Lumen preset", color = SecondaryText, fontSize = 11.sp)
+                    Text(if (customLooks.any { it === look }) "Saved custom look · this session" else "Original Lumen preset", color = SecondaryText, fontSize = 11.sp)
                 }
                 Text("OPEN EDITOR  ›", color = Accent, fontSize = 9.sp, fontWeight = FontWeight.Bold)
             }
