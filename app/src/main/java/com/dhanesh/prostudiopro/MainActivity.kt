@@ -695,6 +695,12 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                         SmallAction(label, { update(values.copy(cropRatio = ratio)) }, Modifier.weight(1f), values.cropRatio == ratio)
                     }
                 }
+                if (values.cropRatio > 0f) {
+                    Text("CUSTOM ASPECT RATIO", color = Accent, fontSize = 10.sp, letterSpacing = 1.5.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
+                    AdjustmentSlider("Fine tune ratio", values.cropRatio, .3f, 2.4f, resetValue = 1f) {
+                        update(values.copy(cropRatio = it))
+                    }
+                }
                 Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     SmallAction("RESET CROP", {
                         update(values.copy(cropRatio = 0f, cropOffsetX = 0f, cropOffsetY = 0f))
