@@ -1053,19 +1053,22 @@ private fun sampleClippingMarkers(bitmap: Bitmap): List<ClippingMarker> {
 }
 private fun sampleChannelLevels(bitmap: Bitmap): FloatArray {
     val sample = Bitmap.createScaledBitmap(bitmap, 32, 32, true)
-    val pixels = IntArray(32 * 32)
-    sample.getPixels(pixels, 0, 32, 0, 0, 32, 32)
-    var red = 0L
-    var green = 0L
-    var blue = 0L
-    pixels.forEach { pixel ->
-        red += (pixel shr 16) and 255
-        green += (pixel shr 8) and 255
-        blue += pixel and 255
+    try {
+        val pixels = IntArray(32 * 32)
+        sample.getPixels(pixels, 0, 32, 0, 0, 32, 32)
+        var red = 0L
+        var green = 0L
+        var blue = 0L
+        pixels.forEach { pixel ->
+            red += (pixel shr 16) and 255
+            green += (pixel shr 8) and 255
+            blue += pixel and 255
+        }
+        val count = pixels.size.toFloat() * 255f
+        return floatArrayOf(red / count, green / count, blue / count)
+    } finally {
+        if (sample !== bitmap && !sample.isRecycled) sample.recycle()
     }
-    val count = pixels.size.toFloat() * 255f
-    if (sample !== bitmap && sample != bitmap) sample.recycle()
-    return floatArrayOf(red / count, green / count, blue / count)
 }
 
 private fun autoAdjust(source: Bitmap, current: Adjustments): Adjustments {
