@@ -534,7 +534,7 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                                 }
                             }
                         },
-                    pointerInput(values.brushMaskEnabled, values.brushSize, values.brushFeather, whiteBalancePicker, source, previewSize) {
+                    pointerInput(values.brushMaskEnabled, values.brushSize, values.brushFeather, whiteBalancePicker, source, previewSize, rendered) {
                         if (values.brushMaskEnabled && !whiteBalancePicker && source != null) {
                             fun mapBrushPoint(position: Offset): BrushPoint? {
                                 val preview = rendered ?: source
@@ -600,16 +600,17 @@ private fun EditorScreen(source: Bitmap?, sourceUri: Uri?, initialValues: Adjust
                             val left = (size.width - drawnWidth) / 2f
                             val top = (size.height - drawnHeight) / 2f
                             val brushWidth = (values.brushSize * minOf(drawnWidth, drawnHeight)).coerceAtLeast(2f)
-                            (values.brushStrokes.map { it.points } + listOf(activeBrushPoints)).forEach { points ->
+                            (values.brushStrokes.map { it.points to it.size } + listOf(activeBrushPoints to values.brushSize)).forEach { (points, sizeFraction) ->
+                                val strokeWidth = (sizeFraction * minOf(drawnWidth, drawnHeight)).coerceAtLeast(2f)
                                 if (points.size == 1) {
-                                    drawCircle(Color(0xFFD5F36A).copy(alpha = .72f), brushWidth / 2f,
+                                    drawCircle(Color(0xFFD5F36A).copy(alpha = .72f), strokeWidth / 2f,
                                         Offset(left + points[0].x * drawnWidth, top + points[0].y * drawnHeight))
                                 } else if (points.size > 1) {
                                     val path = Path().apply {
                                         moveTo(left + points.first().x * drawnWidth, top + points.first().y * drawnHeight)
                                         points.drop(1).forEach { lineTo(left + it.x * drawnWidth, top + it.y * drawnHeight) }
                                     }
-                                    drawPath(path, Color(0xFFD5F36A).copy(alpha = .72f), style = Stroke(width = brushWidth))
+                                    drawPath(path, Color(0xFFD5F36A).copy(alpha = .72f), style = Stroke(width = strokeWidth))
                                 }
                             }
                         }
@@ -1548,7 +1549,7 @@ private fun renderPhoto(source: Bitmap, a: Adjustments, maxDimension: Int): Bitm
                     val width = (stroke.size.coerceIn(0.005f, 0.14f) * minOf(maskW, maskH)).coerceAtLeast(1f)
                     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         color = android.graphics.Color.WHITE
-                        style = Paint.Style.STROKE
+                        style = if (stroke.points.size == 1) Paint.Style.FILL else Paint.Style.STROKE
                         strokeWidth = width
                         strokeCap = Paint.Cap.ROUND
                         strokeJoin = Paint.Join.ROUND
